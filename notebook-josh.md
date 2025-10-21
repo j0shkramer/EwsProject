@@ -79,3 +79,40 @@ Outputs
 https://scfurl.github.io/pacbiowdlR/index.html 
 
 - Offers a suite of functions for visualizing and downstream processing of PacBio WGS WDL workflows
+
+# Sunday, October 19th
+
+## Exploring 9cl_seurat.rds with Seurat and Signac
+
+https://zenodo.org/records/12209095 
+
+https://stuartlab.org/signac/
+
+https://satijalab.org/seurat/ 
+
+{name} = readRDS("path_to_9cl_seurat.rds)
+
+An object of class Seurat 
+213408 features across 19737 samples within 4 assays 
+Active assay: MotifMatrix (870 features, 0 variable features)
+ 2 layers present: counts, data
+ 3 other assays present: GeneExpressionMatrix, ATAC, GeneScoreMatrix
+ 2 dimensional reductions calculated: mo_UMAP, pca
+
+Everything came from one cell line titled: EW
+
+
+
+library(VariantAnnotation)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+library(biomaRt)
+
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+bed_data <- getBM(
+  attributes = c("external_gene_name", "chromosome_name", "start_position", "end_position"),
+  filters = "external_gene_name",
+  values = gene_list,
+  mart = mart
+)
