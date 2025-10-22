@@ -1,0 +1,87 @@
+---
+title: "EDA"
+author: "Josh Kramer"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(Seurat)
+library(Signac) 
+library(ggplot2)
+library(patchwork)
+library(biomaRt)
+library(readxl)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+library(VariantAnnotation)
+```
+
+```{r}
+# celllines = readRDS("~/Documents/EDA/9cl_seurat.rds")
+```
+
+```{r}
+#gene_names = rownames(celllines[["GeneExpressionMatrix"]])
+
+#expr_matrix = GetAssayData(celllines, slot = "counts")
+#gene_expression_counts = rowSums(expr_matrix > 0)
+#head(sort(gene_expression_counts, decreasing = TRUE))
+#feature = c("ETV2", "PROP1", "SP2", "ALX1", "BARX1", "ERG")
+
+```
+
+**Seurat**
+```{r}
+#RidgePlot(celllines, features = feature, ncol = 2)
+#VlnPlot(celllines, features = feature)
+#DotPlot(celllines, features = feature)
+#FeaturePlot(celllines, features = feature)
+```
+
+**Signac**
+```{r}
+#DensityScatter(celllines, x = 'nCount_ATAC', y = 'TSSEnrichment', log_x = TRUE, quantiles = TRUE)
+```
+
+# Getting known genes bed file
+```{r}
+EwSAssiocatedGenes = read_excel("/Users/joshkramer/Documents/EDA/EwS-AssociatedGenes.xlsx")
+mart = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+bed_data = getBM(
+  attributes = c("chromosome_name", "start_position", "end_position", "external_gene_name"),
+  filters = "external_gene_name",
+  values = EwSAssiocatedGenes$`Gene Name`,
+  mart = mart
+)
+
+
+datasets = listDatasets(mart)
+
+
+bed_data = bed_data %>% relocate(external_gene_name, .after = end_position)
+
+canonical_chrom = c(as.character(1:22), "X", "Y")
+
+bed_data = bed_data %>% filter(chromosome_name %in% canonical_chrom)
+
+```
+
+# Creating and sorting the bed file
+```{r}
+
+chrom_order = c(as.character(1:22), "X", "Y")
+
+bed_data$chromosome_name = factor(bed_data$chromosome_name, levels = chrom_order, ordered = TRUE)
+
+bed_data_sorted = bed_data[order(bed_data$chromosome_name, bed_data$start_position), ]
+
+
+bed_data_sorted = bed_data_sorted %>% 
+  mutate(chromosome_name = paste("chr",chromosome_name, sep=""))
+
+write.table(bed_data_sorted, file = "EwSAscGenes.bed", col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
+
+```

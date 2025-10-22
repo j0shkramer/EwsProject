@@ -99,9 +99,7 @@ Active assay: MotifMatrix (870 features, 0 variable features)
  3 other assays present: GeneExpressionMatrix, ATAC, GeneScoreMatrix
  2 dimensional reductions calculated: mo_UMAP, pca
 
-Everything came from one cell line titled: EW
-
-
+Everything came from one cell line titled: EW?
 
 library(VariantAnnotation)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
@@ -116,3 +114,20 @@ bed_data <- getBM(
   values = gene_list,
   mart = mart
 )
+
+# Wednesday, October 22th
+
+## Creating a BED file of EwS Assiocated Genes
+
+Used the R library readxl to convert the Excel file of EwS assiocated genes found through literature into R, then extracted the external gene name, chromosome name, start and end position for each EwS assiocated gene
+
+There was an issue with some of the genes not being listed on canonical chromosomes, I had to remove these genes from the data set because they would have issues with future analysis down the line. 
+
+The BED file was generated from
+Dataset: hsapiens_gene_ensembl
+Description: Human genes (GRCh38.p14)
+Version: GRCh38.p14
+
+These genes were: EHMT2, DYNC1I2, CDKN1C, DUX4
+
+BED File generated called: EwSAscGenes.bed
