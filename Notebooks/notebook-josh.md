@@ -131,3 +131,78 @@ Version: GRCh38.p14
 These genes were: EHMT2, DYNC1I2, CDKN1C, DUX4
 
 BED File generated called: EwSAscGenes.bed
+
+# Friday, October 24th
+
+## Filtering a VCF File
+
+We need to filter our VCF files to only include regions that our covered by EwS assiocated genes in our generated BED file
+
+**ON MY LOCAL LAPTOP**
+```
+conda create --name ews
+```
+
+Possible Options:
+
+### Bedtools
+
+https://bedtools.readthedocs.io/en/latest/ 
+
+```
+conda install bioconda::bedtools
+bedtools --version
+# bedtools v2.31.1
+```
+
+```
+bedtools intersect -a vcf_filtering_test_input.vcf.gz -b EwSAscGenes.bed -wa -u > partial_overlap.vcf
+```
+
+Doesn't seem to be outputting the correct output
+
+### VCFTools
+
+https://vcftools.github.io/index.html 
+
+```
+conda install bioconda::vcftools
+vcftools --version
+# VCFtools (0.1.17)
+```
+vcftools 
+-gzvcf ______.vcf.gz (input vcf file)
+-bed _____.bed (input bed file)
+--remove-filtered-all (remove all variants that do have FILTER == "PASS)
+--recode (create an output file) 
+--stdout | (does not create a zipped file, put it into standard out)
+gzip -c > _____.vcf.gz (zip the output filtered vcf file)
+```
+Does not include partial overlaps in the filtered file
+
+### BCFTools
+
+https://samtools.github.io/bcftools/bcftools.html
+
+```
+conda install bioconda::bcftools
+bcftools--version                                            
+# bcftools 1.22 
+```
+
+Requires files to be bgzip'ed and to have an index file
+
+**CREATE INDEX**
+```
+tabix -p vcf ____.vcf,gz
+```
+
+```
+bcftools 
+view (command to filter a VCF file)
+-R _____.bed (Filter variants based on the genes in the bed file)
+-f PASS (remove variants that did not pass all filters)
+-Oz (makes the output compressed)
+-o _____.vcf.gz (name of the output file)
+____.vcf.gz (vcf file we are filtering)
+```
