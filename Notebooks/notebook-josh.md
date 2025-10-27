@@ -170,6 +170,7 @@ conda install bioconda::vcftools
 vcftools --version
 # VCFtools (0.1.17)
 ```
+```
 vcftools 
 -gzvcf ______.vcf.gz (input vcf file)
 -bed _____.bed (input bed file)
@@ -206,3 +207,45 @@ view (command to filter a VCF file)
 -o _____.vcf.gz (name of the output file)
 ____.vcf.gz (vcf file we are filtering)
 ```
+
+# Monday, October 27th
+
+## Filtering the vcf files
+
+Created new environment **ON TALAPAS** titled: ews
+
+Installed BCFTools to that environment
+
+Uploaded BED file to talapas
+
+```
+scp EwSAscGenes.bed joshkram@login.talapas.uoregon.edu:/projects/bgmp/shared/groups/2025/sarcoma/shared
+```
+
+Tried to run BCFTools on the files, but permission was denied. Trying to copy the files and see if that works
+
+Copying the files and then running the above BCFTools command works
+
+Created a new folder callecd filtered_struc_variants to hold the filtered files
+
+Created an indexed file of each filtered vcf file using 
+
+```
+tabix -p vcf _____
+```
+
+For the cell line PDX305, after running bcftools i got an issue: [W::bgzf_read_block] EOF marker is absent. The input may be truncated
+- I had accidently overwritten the file
+
+| Cell Line | Variants Pre-Filter | Variants Post-Filter |
+|-----------|---------------------|----------------------|
+| A673      | 49659               | 381                  |
+| A4573     | 51331               | 390                  |
+| CHLA9     | 53595               | 394                  |
+| CHLA10    | 60171               | 427                  |
+| PDX305    | 53163               | 395                  |
+| RDES      | 51205               | 396                  |
+| SKNMC     | 49962               | 400                  |
+| TC32      | 63315               | 430                  |
+| TC71      | 52539               | 379                  |
+
