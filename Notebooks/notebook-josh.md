@@ -249,3 +249,17 @@ For the cell line PDX305, after running bcftools i got an issue: [W::bgzf_read_b
 | TC32      | 63315               | 200                  |
 | TC71      | 52539               | 149                  |
 
+## Creating a File of all of the Genes in each cell line found with the variants
+
+Created a python script called variants.py
+
+Takes all nine of the filtered VCF files and the BED file and creates two output files
+
+One file has each cell line and the genes that were found in the area of the variants
+
+The other file has the layout
+GENE CELL LINE VARIANT TYPE
+
+```
+./variants.py -f1 filtered_struc_variants/filtered.A673.GRCh38.structural_variants.phased.vcf.gz -f2 filtered_struc_variants/filtered.A4573.GRCh38.structural_variants.phased.vcf.gz -f3 filtered_struc_variants/filtered.CHLA9.GRCh38.structural_variants.phased.vcf.gz -f4 filtered_struc_variants/filtered.CHLA10.GRCh38.structural_variants.phased.vcf.gz -f5 filtered_struc_variants/filtered.PDX305.GRCh38.structural_variants.phased.vcf.gz -f6 filtered_struc_variants/filtered.RDES.GRCh38.structural_variants.phased.vcf.gz -f7 filtered_struc_variants/filtered.SKNMC.GRCh38.structural_variants.phased.vcf.gz -f8 filtered_struc_variants/filtered.TC32.GRCh38.structural_variants.phased.vcf.gz -f9 filtered_struc_variants/filtered.TC71.GRCh38.structural_variants.phased.vcf.gz -o1 celllinesgenes.tsv -o2 genescelllinevariants.tsv -b EwSAscGenes.bed 
+```
