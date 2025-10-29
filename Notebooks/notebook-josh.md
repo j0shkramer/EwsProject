@@ -263,3 +263,14 @@ GENE CELL LINE VARIANT TYPE
 ```
 ./variants.py -f1 filtered_struc_variants/filtered.A673.GRCh38.structural_variants.phased.vcf.gz -f2 filtered_struc_variants/filtered.A4573.GRCh38.structural_variants.phased.vcf.gz -f3 filtered_struc_variants/filtered.CHLA9.GRCh38.structural_variants.phased.vcf.gz -f4 filtered_struc_variants/filtered.CHLA10.GRCh38.structural_variants.phased.vcf.gz -f5 filtered_struc_variants/filtered.PDX305.GRCh38.structural_variants.phased.vcf.gz -f6 filtered_struc_variants/filtered.RDES.GRCh38.structural_variants.phased.vcf.gz -f7 filtered_struc_variants/filtered.SKNMC.GRCh38.structural_variants.phased.vcf.gz -f8 filtered_struc_variants/filtered.TC32.GRCh38.structural_variants.phased.vcf.gz -f9 filtered_struc_variants/filtered.TC71.GRCh38.structural_variants.phased.vcf.gz -o1 celllinesgenes.tsv -o2 genescelllinevariants.tsv -b EwSAscGenes.bed 
 ```
+
+# Wednesday, October 29th
+
+## Still creating a file of all genes in each cell line found with the variants
+
+There is an issue with my script, not properly getting the end of the structural variant
+
+Created a function to extract the length of the structural variant, and take its absolute value to find the end
+- Deletions consider make the length negative
+
+Final output seems good. Every non-header line in every file is assigned to a gene in the BED file
