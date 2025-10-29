@@ -243,7 +243,7 @@ For the cell line PDX305, after running bcftools i got an issue: [W::bgzf_read_b
 | A4573     | 51331               | 160                  |
 | CHLA9     | 53595               | 164                  |
 | CHLA10    | 60171               | 197                  |
-| PDX305    | 53163               | 164                  |
+| PDX305    | 53163               | 165                  |
 | RDES      | 51205               | 166                  |
 | SKNMC     | 49962               | 170                  |
 | TC32      | 63315               | 200                  |
