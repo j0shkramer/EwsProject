@@ -1,0 +1,96 @@
+---
+title: "methylation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+packageVersion("ggplot2")
+packageVersion("tidyverse")
+packageVersion("dplyr")
+packageVersion("readxl")
+```
+
+Get the peaks data
+
+```{r}
+EwSAssiocatedGenes = read_excel("/Users/joshkramer/Documents/EDA/EwS-AssociatedGenes.xlsx")
+A673.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/A673-peaks-EwSGenes.tsv")
+A4573.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/A4573-peaks-EwSGenes.tsv")
+CHLA9.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/CHLA9-peaks-EwSGenes.tsv")
+CHLA10.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/CHLA10-peaks-EwSGenes.tsv")
+PDX305.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/PDX305-peaks-EwSGenes.tsv")
+RDES.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/RDES-peaks-EwSGenes.tsv")
+SKNMC.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/SKNMC-peaks-EwSGenes.tsv")
+TC32.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/TC32-peaks-EwSGenes.tsv")
+TC71.peaks.EwSGenes = read_tsv(file = "~/bioinfo/EwsProject/filteredpeaks/TC71-peaks-EwSGenes.tsv")
+```
+
+Extract all of the EwS-assoicated genes that were found to be in regions of open chromatin in each cell line. If it was found in that cell line, mark it as true, if not, mark it as false
+
+```{r}
+isOpenChromatin = EwSAssiocatedGenes
+
+A673.genes = A673.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+A4573.genes = A4573.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+CHLA9.genes = CHLA9.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+CHLA10.genes = CHLA10.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+PDX305.genes = PDX305.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+RDES.genes = RDES.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+SKNMC.genes = SKNMC.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+TC32.genes = TC32.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+TC71.genes = TC71.peaks.EwSGenes %>% select(gene_name) %>% unique()
+
+isOpenChromatin = isOpenChromatin %>%
+  mutate(A673 = EwSAssiocatedGenes$`Gene Name` %in% A673.genes$gene_name) %>% 
+  mutate(A4573 = EwSAssiocatedGenes$`Gene Name` %in% A4573.genes$gene_name) %>% 
+  mutate(CHLA9 = EwSAssiocatedGenes$`Gene Name` %in% CHLA9.genes$gene_name) %>% 
+  mutate(CHLA10 = EwSAssiocatedGenes$`Gene Name` %in% CHLA10.genes$gene_name) %>% 
+  mutate(PDX305 = EwSAssiocatedGenes$`Gene Name` %in% PDX305.genes$gene_name) %>% 
+  mutate(RDES = EwSAssiocatedGenes$`Gene Name` %in% RDES.genes$gene_name) %>% 
+  mutate(SKNMC = EwSAssiocatedGenes$`Gene Name` %in% SKNMC.genes$gene_name) %>% 
+  mutate(TC32 = EwSAssiocatedGenes$`Gene Name` %in% TC32.genes$gene_name) %>% 
+  mutate(TC71 = EwSAssiocatedGenes$`Gene Name` %in% TC71.genes$gene_name)
+
+```
+
+```{r}
+isOpenChromatin_filtered = isOpenChromatin %>%
+  filter(!if_all(-`Gene Name`, ~ . == TRUE))
+
+
+
+```
+
+Create a heat map to show the differences 
+
+102 of the 120 EwS-associated genes were found to lie on a region of open chromatin in all cell lines
+
+```{r}
+isOpenChromatin_filtered %>% pivot_longer(cols = -`Gene Name`) %>% 
+  ggplot(aes(y = name, x = `Gene Name`, fill = value)) + 
+  geom_tile(color = "black") + 
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "grey")) +
+  labs(x = "Gene Name", y = "Cell Line", fill = "Lies on Open Chromatin?", title = "Does the EwS-Associated Gene Lie on a Region of Open Chromatin?") + 
+  theme(legend.title = element_text(size = 0),
+      legend.text = element_text(size = 6),
+      axis.text.x = element_text(angle = 45, hjust = 1, margin = margin(t = 2)))
+
+
+```
