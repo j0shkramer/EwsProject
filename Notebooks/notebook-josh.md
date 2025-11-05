@@ -274,3 +274,36 @@ Created a function to extract the length of the structural variant, and take its
 - Deletions consider make the length negative
 
 Final output seems good. Every non-header line in every file is assigned to a gene in the BED file
+
+# Wednesday, November 5th
+
+## PharmCat
+
+Found a file within the pacbiowdlR directory for each cell line that creates a personalized summary that analyzes genetic variants within a genome to do precision medicine 
+
+
+## Investigating methylation patterns in Fiber-Seq
+
+https://fiberseq.github.io/ 
+
+Installed fibertools to the environment "ews" on Talapas
+
+```
+conda install bioconda::fibertools-rs
+ft --version
+fibertools-rs 0.3.2 commit:
+```
+
+https://fiberseq.github.io/FIRE/docs/ 
+
+My approach is to filter through the FIRE output peaks file, and extract regions that correspond to genes associated with EwS
+
+In general, when the nuc_coverage is greater than the msp_coverage, that region is considered to be "closed", while the opposite is considered to be "open"
+
+See if there is a pattern of these genes being opened or closed across the cell lines, and how the structural variants impact that?
+
+Wrote a script to do so called filterpeaks.py
+
+Placing all filtered peak files into a directory called filteredpeaks
+
+Moved the filteredpeaks directory to my local computer so I can do more investigation using RStudio
