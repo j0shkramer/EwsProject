@@ -226,6 +226,15 @@ Because readRDS() decompresses .rds object, amount of memory it's taking up grea
 Can't even subset, R won't load the obj at all without crashing/terminating session.<br>
 For the time being will try and do things on local R Studio. Downloaded .rds and _clean.tsv
 
+----
+### SOFTWARE VERIONS
+
+
+R version 4.5.1 (2025-06-13)<br>
+Seurat 5.3.0
+
+----
+
 ```r
 seurat_ob #loaded Seurat object
 
@@ -292,7 +301,7 @@ Active assay: MotifMatrix (870 features, 0 variable features)
 
 ## Sun, Mon 11/02-11/03
 
-will go back in and flesh out more
+### will flesh these details out more
 
 - inspected metadata
 - default assay is MotifMatrix, set default to geneexpressionmatrix
@@ -310,8 +319,57 @@ will go back in and flesh out more
 
 - next big step is integrating the .tsv file vini and josh made and see where there's overlap(?)
 
-    - overlap gene list .tsv (see where rna clusters + variant affected genes)
-    - compare w/i cell lines
-    - compare ACROSS cell lines
+    1. look at RNAseq cluster markers to gene list .tsv (no variants)
+        - see where there's overlap in expression/DE
     
-    - pathway/GO enrichment (vini and josh)
+    2. compare within cell lines
+    3. compare across cell lines
+    4. for OVERLAPPING genes
+        - pull info from genes + variants.tsv
+
+    5. pathway/GO enrichment (vini and josh)
+
+
+
+## Tues 11/04
+
+
+Met w/ Hope: still need to backtrack and integrate. Thought I didn't have to because saw clusters col in metadata but that's for UNINTEGRATED data. 
+
+Workflow:
+
+integrate
+PCA
+UMAP
+neighbors
+cluster
+
+will also need to annotate cells, look in github script to see if there was annotation done? talk to kobe as well? (final stage clustering)
+- what methods to use to cluster? 
+    - singleR, cell x (?)
+
+Then can switch back to unintegerated data for DGE
+
+## Wed 11/05
+
+
+Ran out of memory locally to split object for integration, switching back to docker/Talapas.
+
+Updated run_rstudio...v04-thejes.sh to bump mem and cpus
+
+#!/bin/bash
+#SBATCH --account=bgmp
+#SBATCH --partition=bgmp
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=64GB
+#SBATCH --job-name=rstudio-prod
+#SBATCH --signal=USR2@60
+
+slurm-39767942.out
+
+Integrated data, clusters reduced from 25-9. UMAP visualizations and heatmap of distribution of cell lines amongst UMAP.
+
+Still need to annotate cells
+
+
+
