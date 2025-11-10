@@ -314,3 +314,13 @@ dplyr version 1.1.4
 readxl version 1.4.5
 
 After analysis, of the 120 EwS-associated genes we analyzed, 102 genes were found to lie on a region of open chromatin in all cell lines, 9 were found to lie on a region of closed chromatin in all cell lines, and 9 were variable across the cell lines
+
+# Monday, November 10th
+
+## Downloading Thejes's RDS Object
+
+Thejes created an updated version of the RDS object with a new column for the intregrated data (integrated_cca) and another called seurat_clusters that contains information about the nine clusters identifed after intregration.
+
+Need to download the object for enrichment analysis and to verify my chromatin architeture information (hopefully I did that correctly!!!!!)
+
+Downloaded it to my local computer, but am putting it in a .gitignore so that it doesn't upload to GitHub
