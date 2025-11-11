@@ -324,3 +324,27 @@ Thejes created an updated version of the RDS object with a new column for the in
 Need to download the object for enrichment analysis and to verify my chromatin architeture information (hopefully I did that correctly!!!!!)
 
 Downloaded it to my local computer, but am putting it in a .gitignore so that it doesn't upload to GitHub
+
+# Tuesday, November 11th
+
+## Validating the chromatin findings
+
+Put the R markdown in EwSProject/filteredpeaks/
+
+Seurat Package version = ‘5.3.0’
+
+Tidyverse Package version = '2.0.0'
+
+Genes to investigate
+
+CDKN1C
+CDKN2A
+CFKN2B
+CTSD
+MFNG
+NFX2-2
+NR0B1
+PEG3
+PPARGCA1A
+
+Encountered an issue where the Seurat object labels everything as "EW" instead of its individual cell line which creates issues with visualizations. Asking Hope for help

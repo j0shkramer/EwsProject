@@ -1,0 +1,41 @@
+---
+title: "validatingFiberSeq"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE)
+```
+
+```{r}
+library(Seurat)
+library(SeuratObject)
+library(tidyverse)
+library(ggplot2)
+packageVersion("Seurat")
+packageVersion("tidyverse")
+```
+
+Download the RDS objects
+
+```{r}
+EwS = readRDS("~/bioinfo/EwsProject/Multiome/9cl_seurat.rds")
+
+EwS_integrated = readRDS("~/bioinfo/EwsProject/Multiome/cluster_markers.rds")
+```
+
+Create the Violin Plots
+
+```{r}
+VlnPlot(EwS, 
+        features = "PEG3",
+        assay = "GeneExpressionMatrix")
+```
+
+```{r}
+EwS_integrated %>% 
+  filter(gene == "PEG3") %>% 
+  ggplot(aes(y = avg_log2FC, fill = cluster)) +
+  geom_bar()
+```
