@@ -22,20 +22,28 @@ Download the RDS objects
 ```{r}
 EwS = readRDS("~/bioinfo/EwsProject/Multiome/9cl_seurat.rds")
 
+Idents(EwS) = EwS$cell_line
+
 EwS_integrated = readRDS("~/bioinfo/EwsProject/Multiome/cluster_markers.rds")
 ```
 
 Create the Violin Plots
 
 ```{r}
-VlnPlot(EwS, 
-        features = "PEG3",
-        assay = "GeneExpressionMatrix")
+
+genes = c("CDKN1C","CDKN2A","CFKN2B","CTSD","MFNG","NFX2-2","NR0B1","PEG3","PPARGCA1A")
+
+genescorematrix = VlnPlot(EwS, 
+        features = genes,
+        assay = "GeneScoreMatrix")
+
+ggsave("genescorematrix.pdf", plot = genescorematrix, height = 10, width = 10)
 ```
 
 ```{r}
-EwS_integrated %>% 
-  filter(gene == "PEG3") %>% 
-  ggplot(aes(y = avg_log2FC, fill = cluster)) +
-  geom_bar()
+geneexpressionmatrix = VlnPlot(EwS, 
+        features = genes,
+        assay = "GeneExpressionMatrix")
+
+ggsave("geneexpressionmatrix.pdf", plot = geneexpressionmatrix, height = 10, width = 10)
 ```

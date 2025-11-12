@@ -348,3 +348,17 @@ PEG3
 PPARGCA1A
 
 Encountered an issue where the Seurat object labels everything as "EW" instead of its individual cell line which creates issues with visualizations. Asking Hope for help
+
+# Wednesday, November 12th
+
+## Continuing validating the chromatin findings
+
+This reset the cell lines and put them towards their proper state
+
+```
+Idents(Ews) = Ews$cell_line
+```
+
+The following requested genes were not found: CFKN2B, NFX2-2, PPARGCA1A
+
+Creating a plot of the gene expression data (RNA-seq data) and a plot of the gene matrix score (ATAC-seq data)
