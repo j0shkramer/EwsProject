@@ -226,7 +226,7 @@ Tried to run BCFTools on the files, but permission was denied. Trying to copy th
 
 Copying the files and then running the above BCFTools command works
 
-Created a new folder callecd filtered_struc_variants to hold the filtered files
+Created a new folder callecd EwS_filtered_struc_variants to hold the filtered files
 
 Created an indexed file of each filtered vcf file using 
 
@@ -362,3 +362,56 @@ Idents(Ews) = Ews$cell_line
 The following requested genes were not found: CFKN2B, NFX2-2, PPARGCA1A
 
 Creating a plot of the gene expression data (RNA-seq data) and a plot of the gene matrix score (ATAC-seq data)
+
+# Saturday, November 15th
+
+## Creating all Known Genes BED File
+
+After the meeting with Scott, he stated the intention of wanting to not solely focus on previously established EwS-assoicated genes. This will begin with creating a new BED file with all known human genes.
+
+Created HumanGenes.Bed in BED-File/
+
+Uploaded file to Talapas
+
+## Filtering Variants within genes
+
+To filter the VCF files for structural variants within genes
+
+```
+bcftools 
+view (command to filter a VCF file)
+-R _____.bed (Filter variants based on the genes in the bed file)
+-f PASS (remove variants that did not pass all filters)
+-Oz (makes the output compressed)
+-o _____.vcf.gz (name of the output file)
+____.vcf.gz (vcf file we are filtering)
+```
+
+To create a .tbi file which is necessary for accessing the VCF files
+
+```
+tabix -p vcf ____.vcf.gz
+```
+
+| Cell Line | Variants Pre-Filter | Variants Post-Filter |
+|-----------|---------------------|----------------------|
+| A673      | 49659               | 25732                  |
+| A4573     | 51331               | 26516                  |
+| CHLA9     | 53595               | 27564                  |
+| CHLA10    | 60171               | 31111                  |
+| PDX305    | 53163               | 27408                  |
+| RDES      | 51205               | 26499                  |
+| SKNMC     | 49962               | 25558                  |
+| TC32      | 63315               | 32785                  |
+| TC71      | 52539               | 26966                  |
+
+Creating files that contain gene, cell line, variant info and variant type for further analysis
+
+```
+./variants.py -f1 filtered_struc_variants/genes.A673.GRCh38.structural_variants.phased.vcf.gz -f2 filtered_struc_variants/genes.A4573.GRCh38.structural_variants.phased.vcf.gz -f3 filtered_struc_variants/genes.CHLA9.GRCh38.structural_variants.phased.vcf.gz -f4 filtered_struc_variants/genes.CHLA10.GRCh38.structural_variants.phased.vcf.gz -f5 filtered_struc_variants/genes.PDX305.GRCh38.structural_variants.phased.vcf.gz -f6 filtered_struc_variants/genes.RDES.GRCh38.structural_variants.phased.vcf.gz -f7 filtered_struc_variants/genes.SKNMC.GRCh38.structural_variants.phased.vcf.gz -f8 filtered_struc_variants/genes.TC32.GRCh38.structural_variants.phased.vcf.gz -f9 filtered_struc_variants/genes.TC71.GRCh38.structural_variants.phased.vcf.gz -o1 genespercellline.tsv -o2 genecelllinevariant.tsv -b HumanGenes.bed 
+```
+
+INS = Insertion
+DEL = Deletion
+BND = Breakpoint
+DUP = Duplication
