@@ -18,33 +18,6 @@ library(org.Hs.eg.db)
 library(VariantAnnotation)
 ```
 
-```{r}
-# celllines = readRDS("~/Documents/EDA/9cl_seurat.rds")
-```
-
-```{r}
-#gene_names = rownames(celllines[["GeneExpressionMatrix"]])
-
-#expr_matrix = GetAssayData(celllines, slot = "counts")
-#gene_expression_counts = rowSums(expr_matrix > 0)
-#head(sort(gene_expression_counts, decreasing = TRUE))
-#feature = c("ETV2", "PROP1", "SP2", "ALX1", "BARX1", "ERG")
-
-```
-
-**Seurat**
-```{r}
-#RidgePlot(celllines, features = feature, ncol = 2)
-#VlnPlot(celllines, features = feature)
-#DotPlot(celllines, features = feature)
-#FeaturePlot(celllines, features = feature)
-```
-
-**Signac**
-```{r}
-#DensityScatter(celllines, x = 'nCount_ATAC', y = 'TSSEnrichment', log_x = TRUE, quantiles = TRUE)
-```
-
 # Getting known genes bed file
 ```{r}
 EwSAssiocatedGenes = read_excel("/Users/joshkramer/Documents/EDA/EwS-AssociatedGenes.xlsx")
@@ -83,5 +56,42 @@ bed_data_sorted = bed_data_sorted %>%
   mutate(chromosome_name = paste("chr",chromosome_name, sep=""))
 
 write.table(bed_data_sorted, file = "EwSAscGenes.bed", col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
+
+```
+
+# Getting all known genes bed file
+```{r}
+mart = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+all_genes = getBM(
+  attributes = c("chromosome_name", "start_position", "end_position", "external_gene_name"),
+  mart = mart
+)
+
+
+all_genes = all_genes %>% relocate(external_gene_name, .after = end_position)
+
+canonical_chrom = c(as.character(1:22), "X", "Y")
+
+all_genes = all_genes %>% filter(chromosome_name %in% canonical_chrom)
+
+
+all_genes = all_genes %>% filter(external_gene_name != "")
+```
+
+# Creating and sorting the bed file
+```{r}
+
+chrom_order = c(as.character(1:22), "X", "Y")
+
+all_genes$chromosome_name = factor(all_genes$chromosome_name, levels = chrom_order, ordered = TRUE)
+
+all_genes_sorted = all_genes[order(all_genes$chromosome_name, all_genes$start_position), ]
+
+
+all_genes_sorted = all_genes_sorted %>% 
+  mutate(chromosome_name = paste("chr",chromosome_name, sep=""))
+
+write.table(all_genes_sorted, file = "HumanGenes.bed", col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
 
 ```
