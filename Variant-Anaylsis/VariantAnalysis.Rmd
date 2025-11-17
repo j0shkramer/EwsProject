@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(gt)
+library(patchwork)
 ```
 
 # Generate the variants data frame
@@ -75,7 +76,7 @@ insertions = variants %>%
   geom_bar(stat = "identity", color = "blue") +
   labs(y = "", x = "", title = "Insertions") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+    axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 
@@ -84,10 +85,10 @@ deletions = variants %>%
   filter(Variant_Type == "Deletion") %>% 
   mutate(count = 1) %>% 
   ggplot(aes(x = Cell_Line, y = count)) +
-  geom_bar(stat = "identity", color = "lightblue") +
-  labs(y = "", x = "", title = "Deletions") +
+  geom_bar(stat = "identity", color = "steelblue") +
+  labs(y = "", x = "", title = "Duplications") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+    axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 
@@ -99,7 +100,7 @@ duplications = variants %>%
   geom_bar(stat = "identity", color = "steelblue") +
   labs(y = "", x = "", title = "Duplications") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+    axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 
@@ -111,7 +112,7 @@ breakpoints = variants %>%
   geom_bar(stat = "identity", color = "darkblue") +
   labs(y = "", x = "", title = "Breakpoints") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+    axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 
