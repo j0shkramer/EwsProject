@@ -1,0 +1,124 @@
+---
+title: "VariantAnalysis"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(gt)
+```
+
+# Generate the variants data frame
+
+```{r}
+variants = read_tsv(file = "~//bioinfo/EwsProject/Variant-Anaylsis/variantspercellline.tsv")
+```
+
+# Exploratory Data Anaylsis
+
+```{r}
+genes_per_cell_line = variants %>% 
+  dplyr::select(Cell_Line, Gene) %>% 
+  distinct() %>% 
+  count(Cell_Line)
+
+genes_per_cell_line = genes_per_cell_line %>% 
+  dplyr::rename(`Genes` = n, `Cell Line` = Cell_Line)
+
+genes_per_cell_line %>% 
+  gt() %>% 
+  tab_header(title = "# of Genes that have Variants in Each Cell Line")
+```
+
+```{r}
+unique_genes_per_cell_line = variants %>%
+  distinct(Cell_Line, Gene, .keep_all = TRUE) %>%
+  group_by(Gene) %>%
+  mutate(cell_count = n_distinct(Cell_Line)) %>%
+  filter(cell_count == 1) %>% 
+  ungroup()
+
+
+unique_gene_count = unique_genes_per_cell_line %>% 
+  count(Cell_Line) %>% 
+  dplyr::rename(`Cell Line` = Cell_Line, `Genes` = n)
+
+unique_gene_count %>% 
+  gt() %>% 
+  tab_header(title = "# of Unique Genes with Variants per Cell Line")
+```
+
+```{r}
+variants %>% 
+  na.omit(variants) %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count, fill = Variant_Type)) +
+  geom_bar(stat = "identity") +
+  labs(y = "# of Variants", x = "Cell Line", fill = "Variant Type", title = "Number of Variants per Cell Line") +
+  scale_fill_manual(values = c("Breakpoint" = "red", 
+                               "Deletion" = "blue", 
+                               "Duplication" = "steelblue", 
+                               "Insertion" = "lightblue"))
+```
+
+# Graph for the types of variants in each cell type
+
+```{r}
+insertions = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Insertion") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "blue") +
+  labs(y = "", x = "", title = "Insertions") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+  )
+
+
+deletions = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Deletion") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "lightblue") +
+  labs(y = "", x = "", title = "Deletions") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+  )
+
+
+duplications = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Duplication") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "steelblue") +
+  labs(y = "", x = "", title = "Duplications") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+  )
+
+
+breakpoints = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Breakpoint") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkblue") +
+  labs(y = "", x = "", title = "Breakpoints") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate labels 45 degrees
+  )
+
+
+((insertions + deletions) / (duplications + breakpoints)) + 
+  plot_annotation(
+    title = "Number of Variants within Genes per Cell Line",
+    caption = "X Axis: Cell Line | Y Axis: Number of Variants"
+  )
+
+```

@@ -415,3 +415,35 @@ INS = Insertion
 DEL = Deletion
 BND = Breakpoint
 DUP = Duplication
+
+# Monday, November 17th
+
+## Analyzing the variants per gene per cell line
+
+Created a new directory called Variant-Anaylsis and pulled the generated files from above to the new directory; however, the file is above the GitHub limit of 100 MB so it cannot be uploaded to Github
+
+| Cell Line | Genes w/ Variants | 
+|-----------|---------------------|
+| A673      | 39169               |
+| A4573     | 38251               | 
+| CHLA9     | 39389               | 
+| CHLA10    | 39213               | 
+| PDX305    | 38846               |
+| RDES      | 39439               | 
+| SKNMC     | 38984               |
+| TC32      | 39546               | 
+| TC71      | 38389               |
+
+| Cell Line | Unique Genes w/ Variants | 
+|-----------|---------------------|
+| A673      | 10               |
+| A4573     | 50               | 
+| CHLA9     | 47               | 
+| CHLA10    | 1               | 
+| PDX305    | 6               |
+| RDES      | 77               | 
+| SKNMC     | 14               |
+| TC32      | 37               | 
+| TC71      | 39               |
+
+
