@@ -447,3 +447,12 @@ Created a new directory called Variant-Anaylsis and pulled the generated files f
 | TC71      | 39               |
 
 
+# Wednesday, November 19th
+
+## Investigating methylation patterns in EWS-FLI1 fusion
+
+Attempting to see if there is a difference in the methylation patterns of the wildtype versus fusion of the genes
+
+Need to find a way to view the .bam files (they are so so big so they cannot be copied to my local computer)
+
+This is not going well. I am going to email Kobi and try to get some clarification. 
