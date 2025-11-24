@@ -456,3 +456,14 @@ Attempting to see if there is a difference in the methylation patterns of the wi
 Need to find a way to view the .bam files (they are so so big so they cannot be copied to my local computer)
 
 This is not going well. I am going to email Kobi and try to get some clarification. 
+
+# Friday, November 21st
+
+## IGV
+
+Downloaded IGV on Talapas in an environment called igv
+
+# Monday. November 24th
+
+## IGV 
+

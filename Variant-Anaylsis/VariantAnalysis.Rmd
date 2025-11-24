@@ -16,6 +16,9 @@ library(patchwork)
 
 ```{r}
 variants = read_tsv(file = "~//bioinfo/EwsProject/Variant-Anaylsis/variantspercellline.tsv")
+
+
+# variants %>% filter(Variant_Type == "Breakpoint", Gene == "FLI1") 
 ```
 
 # Exploratory Data Anaylsis
