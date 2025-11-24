@@ -467,3 +467,148 @@ Downloaded IGV on Talapas in an environment called igv
 
 ## IGV 
 
+```
+conda install bioconda::igv
+```
+
+This ain't working. Anger
+
+## Investigating other fusions
+
+Continued my investigation ins the VariantAnalysis.Rmd
+
+All from the filtered and annotated VCF file
+
+| Cell Line | FLI1-Fusion Reads  | EWSR1-Fusion Reads  |
+|---|---|---|
+| A4573  | 4  | 4  |
+| A673  | 4 |  4 |
+| CHLA10 | 6 |  6 |
+| CHLA9  | 2 | 2  |
+| PDX305  | 4  | 4  |
+| RDES  |  4 |  4 |
+| SKNMC  |  4 | 4  |
+| TC32 |  8 | 8  |
+| TC71  |  4 |  4 |
+
+Based on this, you need to have an equal amount of reads from both of the "fused" genes, and the range of reads goes from 2 to 8. This is a very broad category, but we can begin further analysis.
+
+To investigate, I am going through each cell line's fusions, looking for genes that have a decent amount of fusion reads, and verifying if they have a corresponding gene that has the same number of fusions.
+
+### A673
+
+Possible Fusions of interest:
+
+CHRDL2: 4 reads, but the reads correspond to two different genes (SUPT20H, STOML3) so probably fake
+
+LINC00221: 4 reads, but the reads correspond to two different chromsomes (3, 16) so probably fake
+
+HIVEP3-SUCLA2: 2 reads **POSSIBLE FUSION**
+
+### A4573
+
+**MAP2-PDE10A**: 4 reads of each gene, point to the same location -> **POSSIBLE FUSION?**
+
+COL25A1: Could not find any corresponding gene that the reads matched to; probably fake
+
+SH3D19: This was marked as a breakpoint, but was a mistake 
+
+LINC01440: Could not find any corresponding gene that the reads matched to; probably fake
+
+### CHLA9
+
+EPHA3: Corresponded to multiple genes, probably fake
+
+LINC01470: Corresponded to multiple genes, probably fake
+
+SGCD: Didn't have a corresponding gene, probably fake
+
+RIMS1: Corresponded to multiple genes, probably fake
+
+MSL3-DT: Corresponded to multiple genes, probably fake
+
+SPANXA2-OT1: Corresponded to multiple genes, probably fake
+
+### CHLA10
+
+HIVEP3-SUCLA2: 2 reads, also found in A673
+
+HOWEVER, this was the same case in the A4573 cell line
+
+CALM2-PCCA: 4 reads of each gene, point to the same location -> **POSSIBLE FUSION?**
+
+RIMS1: Pointed to multple chromsomes (X, 7), so probably fake
+
+TLK2: Could not find a corresponding gene, probably fake
+
+LINC00221: 4 reads, but the reads correspond to two different chromsomes (3, 16) so probably fake
+
+SPG7: 4 reads, but the reads correspond to two different chromsomes (3, 14) so probably fake
+
+### PDX305
+
+ZNF589: 4 reads, but the reads correspond to two different chromsomes (11, 22) so probably fake
+
+SGCD: Could not find a corresponding gene, probably fake
+
+MEI4: Could not find a corresponding gene, probably fake
+
+PTPRR: 4 reads, but the reads correspond to two different chromsomes (3, X) so probably fake
+
+### RDES
+
+FAM242F: Points to two different genes at roughly the same place (MOB2, DNHD1), probably fake
+
+LINC02735: FAKE
+
+RNASEH2C-KAT5: **Possible fusion?**, only two reads and these reads map to the exact same starting and stopping point
+
+### SKNMC
+
+CNKSR2-KIF1B: **Possible fusion**, 4 reads that map together
+
+YEATS2-GALNT13: **Possible fusion**, 4 reads that map together
+
+MAGI3: No corresponding gene, probably fake
+
+SGCD: No corresponding gene found, probably fake
+
+DLG2: Inversion?
+
+### TC32
+
+LAMB4-ZMYM1: **Possible fusion**, 4 reads that map together
+
+HIVEP3-SUCLA2: **Possible fusion**, Also found in CHLA10, A673
+
+SGCD: No corresponding gene
+
+CHRDL2: Matches to two genes in relatively close succession (SUPT20H, STOML3), probably fake 
+
+SPG7: Maps to two different chromosomes (3, 14), probably fake
+
+### TC71
+
+LINC02487-IGFBP5: 4 matching reads. **POSSIBLE FUSION**
+
+SEC24A: Couldn't find corresponding gene
+
+CSMD3: Inversion? - chromosome 8 
+
+TRPS1: Inversion? - chromosome 8
+
+SNTB1: Inversion? - chromosome 8
+
+PRELID2-ACACB: Two matching reads, **POSSIBLE FUSION**
+
+TCTN1-EIF6: Four matching reads, **POSSIBLE FUSION**
+
+MCF2L: No corresponding gene match
+
+## Interesting Findings
+
+In most cell lines, there was evidence of actual fusions; however, the majority of them, if they are real, are limited to a single cell line. Besides for the HIVE3P-SUCLA2 fusion which was found in three cell lines: A673, CHLA10, TC32
+
+HIVEP3 - https://www.ncbi.nlm.nih.gov/gene/59269 
+
+SUCLA2 - https://www.ncbi.nlm.nih.gov/datasets/gene/8803/ 

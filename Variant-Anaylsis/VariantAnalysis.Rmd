@@ -16,9 +16,6 @@ library(patchwork)
 
 ```{r}
 variants = read_tsv(file = "~//bioinfo/EwsProject/Variant-Anaylsis/variantspercellline.tsv")
-
-
-# variants %>% filter(Variant_Type == "Breakpoint", Gene == "FLI1") 
 ```
 
 # Exploratory Data Anaylsis
@@ -125,4 +122,27 @@ breakpoints = variants %>%
     caption = "X Axis: Cell Line | Y Axis: Number of Variants"
   )
 
+```
+# Exploring other fusions: attempting to back up their legitimacy
+
+```{r}
+variants %>% 
+  filter(Variant_Type == "Breakpoint" & (Gene == "EWSR1")) %>% 
+  count(Cell_Line)
+
+variants %>% 
+  filter(Variant_Type == "Breakpoint" & (Gene == "FLI1")) %>% 
+  count(Cell_Line)
+```
+```{r}
+breakpoints = variants %>% 
+  filter(Variant_Type == "Breakpoint")
+```
+
+```{r}
+breakpoints %>% 
+  filter(Gene != "FLI1" & Gene != "EWSR1") %>% 
+  filter(Cell_Line == "TC71") %>% 
+  filter(Gene == "MCF2L")
+  filter(grepl("chr13",Variant_Info) == TRUE)
 ```
