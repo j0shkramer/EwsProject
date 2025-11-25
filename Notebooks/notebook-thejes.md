@@ -649,7 +649,7 @@ Contains:
     - top 100 up/down regulated genes
     - /projects/bgmp/shared/groups/2025/sarcoma/shared/Multiome
 
-## Sun-Mon, 11/24-11/25
+## Sun-Mon, 11/23-11/24
 
 Recapping:
 
@@ -702,26 +702,78 @@ Notes:
 
 [Collections](https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp#H)<br>
 - Hallmark gene sets
-    - EMT (epithelial mesenchymal transition)
-        - process involved in many things including metastasis
-        - when epithelial cells gain migratory, mesenchymal features
-    - G2M checkpoint
-        - proliferation markers (mitotic activity)
-    - E2F
-        - targets E2F transcription factors
-        - EWS::FLI interact with E2F tf
-        - E2F: S-phase entry
+    - HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION
+        - EMT (epithelial mesenchymal transition)
+            - process involved in many things including metastasis
+            - when epithelial cells gain migratory, mesenchymal features
+    - HALLMARK_G2M_CHECKPOINT
+        - G2M checkpoint
+            - proliferation markers (mitotic activity)
+    - HALLMARK_E2F_TARGETS
+        - E2F
+            - targets E2F transcription factors
+            - EWS::FLI interact with E2F tf
+            - E2F: S-phase entry
+
+    - 
 - Gene ontology gene sets (C5)<br>
-from HOXD13 paper:<br>
 
 UP
-- GO_NEUROGENSIS
-- GO_NEURON_DIFFERENTATION
-- GO_NEURON_DEVELOPMENT
-- GO_NEURON_PROJECTION (?)
+- GOBP_NEUROGENESIS
+- GOBP_NEURON_DIFFERENTATION
+- GOBP_NEURON_DEVELOPMENT
+- GOBP_NEURAL_CREST_CELL_FATE_COMMITMENT
 
 DOWN
-- GO_CELL_JUNCTION_ORGANIZATION
-- GO_BIOLOGICAL_ADHESION
-- GO_CELL_SUBSTRATE_AHDESION
+- GOBP_EXTRACELLULAR_MATRIX_ORGANIZATION
+- GOBP_BIOLOGICAL_ADHESION
+- GOBP_CELL_MIGRATION
+- GOBP_MESENCHYME_DEVELOPMENT
 
+note: need to double check these are the final gene sets i used, will update later.
+
+https://satijalab.org/seurat/reference/integratedata
+https://satijalab.org/seurat/articles/seurat5_integration
+
+
+#### Git note
+```bash
+git add Notebooks/notebook-thejes.md 
+git commit -m "Update lab notebook"
+git pull --rebase origin main
+git push origin main
+```
+
+
+GO, GSEA:<br>
+install clusterProfiler
+```R
+install.packages("BiocManager")
+library(BiocManager)
+```
+
+----
+### SOFTWARE VERIONS
+
+
+Bioconductor version 3.22 (BiocManager 1.30.27), R 4.5.1 (2025-06-13)
+
+----
+
+Issues installing clusterProfiler:
+
+> .libPaths()
+[1] "/home/tnair/R/rocker-rstudio/4.5.1" "/usr/local/lib/R/site-library"      "/usr/local/lib/R/library"
+
+
+ERROR:
+```R
+io_utils.c:16:10: fatal error: zlib.h: No such file or directory
+...
+ERROR: compilation failed for package ‘XVector’
+```
+
+Apptainer container is missing system libraries (zlib.h)<br>
+So then other libraries cannot be installed. clusterProfiler and all its dependencies failed to install, even when using personal R library path. I would have to rebuild container or use a module with Bioconductor preinstalled.
+
+Easier to just work locally, which is fine because computationally intensive work is already finished.
