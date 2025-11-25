@@ -250,7 +250,7 @@ Active assay: MotifMatrix (870 features, 0 variable features)
 **Features:** genes<br>
 **Active assay:MotifMatrix (870 features, 0 variable features):** dataset focused on analysis of transcription factor binding motifs, no highly variable motifs have been identified<br>
 
----
+
 ## Thur 10/30
 
 Hope mentioned when she used Seurat for clustering etc required 36-50 CPU depending on what she did.
@@ -301,50 +301,37 @@ Active assay: MotifMatrix (870 features, 0 variable features)
 
 ## Sun, Mon 11/02-11/03
 
-### will flesh these details out more
-
-- inspected metadata
-- default assay is MotifMatrix, set default to geneexpressionmatrix
-- data is clustered
-    - C1-25
-- no need to run neighbors or findclusters
+inspected metadata
+- default assay is MotifMatrix, set default to "GeneExpressionMatrix"
 - mo_UMAP is based on geneexpressionmatrix data!!!
     - naming convention seems misleading at first
     - pca based on geneexpresisonmatrix data as well
+- Note 11/04: Data is NOT integrated or clustered (removed notes from this section that were wrong)
 
-- so can go ahead and run FindAllMarkers to find markers that define clusters
-    - this will include up/downregulated genes
-    - can use this immediately for identification of dge and later on for variant integration and pathway analysis
-- figure out what plots to make, what would be the most informative. maybe just plot the top 5 and lowest 5? describe function of gene? not sure.
-
-- next big step is integrating the .tsv file vini and josh made and see where there's overlap(?)
+Next big step (after integrating/clustering, and top marker identification) is integrating the .tsv file vini and josh made and see where there's overlap
 
     1. look at RNAseq cluster markers to gene list .tsv (no variants)
         - see where there's overlap in expression/DE
-    
     2. compare within cell lines
     3. compare across cell lines
     4. for OVERLAPPING genes
         - pull info from genes + variants.tsv
-
     5. pathway/GO enrichment (vini and josh)
 
 
 
 ## Tues 11/04
 
-
 Met w/ Hope: still need to backtrack and integrate. Thought I didn't have to because saw clusters col in metadata but that's for UNINTEGRATED data. 
 
 Workflow:
+- integrate
+- PCA
+- UMAP
+- neighbors
+- cluster
 
-integrate
-PCA
-UMAP
-neighbors
-cluster
-
-will also need to annotate cells, look in github script to see if there was annotation done? talk to kobe as well? (final stage clustering)
+Will also need to annotate cells, look in github script to see if there was annotation done? talk to kobe as well? (final stage clustering)
 - what methods to use to cluster? 
     - singleR, cell x (?)
 
@@ -357,19 +344,384 @@ Ran out of memory locally to split object for integration, switching back to doc
 
 Updated run_rstudio...v04-thejes.sh to bump mem and cpus
 
+```bash
 #!/bin/bash
-#SBATCH --account=bgmp
+#SBATCH --account=bgmp<br>
 #SBATCH --partition=bgmp
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=64GB
 #SBATCH --job-name=rstudio-prod
 #SBATCH --signal=USR2@60
+```
 
 slurm-39767942.out
 
-Integrated data, clusters reduced from 25-9. UMAP visualizations and heatmap of distribution of cell lines amongst UMAP.
+Integrated data, clusters reduced from 25-9. <br>UMAP visualizations and heatmap of distribution of cell lines amongst UMAP.
 
 Still need to annotate cells
 
 
+## Sun 11/09
+
+- Find top up/down regulated markers
+- Need to annotate data by DGE
+- save dataframe/obj and transfer to Josh
+
+- FindAllMarkers(log.fc = 0.25, min.pct = 0.1) based on prev. Seurat defaults and [HBC training guide](https://hbctraining.github.io/scRNA-seq/lessons/09_merged_SC_marker_identification.html)
+
+----
+### SOFTWARE VERSIONS
+
+future 1.67.0
+
+----
+
+install.packages(future)
+
+FindAllMarkers supports parallelization
+library(future):<br>
+performs computations in parallel
+- output message about RStudio not able to use future command? I forgot to save the output
+
+saved object/dataframe:<br>
+/projects/bgmp/shared/groups/2025/sarcoma/shared/Multiome
+
+output files:<br>
+- cluster_markers.rds
+- top100_upregulated
+- top100_downregulated
+
+handed over to josh to start w/ enrichment/pathway analyses <br>
+in the meantime ill work on annotating and structural variant comparisons?
+
+## Mon 11/10
+
+- scale.data not needed for differential expression, pathway/enrichment analyses,
+feature plots, violin plots, or dot plots
+- scale.data IS needed for doheatmap visualizations of DEG or marker genes, 
+PCA or regression on RNA data (if we re-run analyses)
+- run scale.data on marker genes
+    - for DoHeatMap() and any RNA PCA/regression workflow
+    - NOT for dotplots, featureplots, or vlnplots, those use the data slot (which is log-normalized RNA data)
+
+## Tues 11/11
+
+Annotate in a two-pronged approach:
+- Manual annotation: Identify biological programs (mechanisms) by looking at *known* phenotypic markers
+    - ex: EWS::FLI1-high, mesenchymal-like, neural-like, proliferation...
+    - defines cell states
+- Automated annotation: Determine transcriptional programs (from DEGs)
+    - quantitative assessment of gene modules/pathway signatures
+- Goal: automated (transcriptional) should align with manual (biological)
+    - ex: proliferation module and upregulation in proliferation genes
+    - however, if proliferation module vs upregulation in mesenchymal-like genes...
+        - would require further exploration
+
+Automated annotation of genes (transcriptional programs) should match what mechanisms are identified (biological programs)
+
+**Final approach:**<br>
+
+After further thought decided to annotate based on 2 core EwS programs: 
+
+1. Mesenchymal program
+2. Neural program
+
+Defined by HOXD13 transcription activity, outlined in [Apfelbaum et al. 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC9588607/#SD4) paper.
+
+From Table S3. (overlap_up_with_HOXD13_kd sheets)
+- HOXD13 and up/down regulated genes
+
+**Mechanim summary:**<br>
+EWS::FLI1 acts as both activator and repressor, HOXD13 counteracts repressor activity which enables mesenchymal programs
+
+- HOXD13 is a transcription factor that promotes metastatic phenotypes
+- **HOXD13 knockdown:** EWS::FLI1 expression fully effective -> *canonical/neural-like (fusion-high)* state
+- **HOXD13 expressed:** EWS:FLI1 expression partially blocked -> *mesenchymal-like (fusion-low)* state
+
+
+| Gene program| Phenotypic state | Key markers| Notes |
+|--|--|--|--|
+| EWS::FLI1<br> ("down regulated set") | Neural-like |--- | - "Canonical" identity<br>- Fusion active<br>- Differentiation associated<br>- maintain tumor cell identity and proliferation<br>- Low HOXD13 expression (knockout)|
+| HOXD13<br> ("up regulated set") | Mesenchymal-like |--- | - Fusion-low <br>- counteracts repressor activity<br>- migratory driven program<br>- mesenchymal transition<br>- metastatic potential | 
+
+Potential modifiers?
+
+| Modifier | States | Markers |
+| --| -- | -- |
+| Proliferation | cell cycle stages | --- |
+
+Tumor cells can co-exist across these two states within the same sample
+
+Canonical (neural-like):<br> 
+- "classic" state
+- non-migatory, round, tightly packed, proliferative ("stem-like")
+    - small round blue cell tumor: pathology 
+    - undifferentiated and compact
+    - high nuclear-cytoplasm ratio
+
+Mesenchymal:<br>
+- Migratory state, invasive 
+- partially loses canonical signature so transcriptional activity looks less like classic EwS
+
+
+## Sat-Mon 11/15-11/17
+
+Apfelbaum 2022 paper:
+
+Upregulated after HOXD13 KD:
+- Belong to HOXD13 LOW, EWS::FLI1 HIGH
+- "held-back" by HOXD13 expression 
+- neural-like
+
+Downregulated after HOXD13 KD:
+- HOXD13 HIGH, EWS::FLI1 LOW
+- require HOXD13 expression
+- mesenchymal-like
+
+| Cluster | Top markers (4 DEGs)          | Interpretation                                   |Label?                       |
+| ------: | -------------------------------- | ---------------------------------------------------------------- | ------------------------------------- |
+|       0 | FBXO32, MIR34AHG, TRIM22, ITGBL1 | Stress + ECM + muscle/atrophy → mesenchymal / ECM-ish, G1        | **Mes-like / ECM–stress**             |
+|       1 | CAMK4, TP73, FAM111B, E2F2       | TP73/E2F2 → cell cycle & regulatory: HOXD13 mes-leaning     | **Mes-like / proliferative**          |
+|       2 | PIF1, PSRC1, ARHGAP11B, APOLD1   | Mitotic / spindle / DNA replication + ARHGAP11B (progenitor)     | **Mitotic / proliferative**           |
+|       3 | CIB4, IL1RAPL2, MROH2A, HS3ST2   | IL1RAPL2 & HS3ST2 → neural / synaptic: HOXD13 neural cluster     | **Neural-like**                       |
+|       4 | IL3RA, SYT6, IER2, JUNB          | Immediate early (IER2, JUNB) + mixed signaling → stress/response | **Stress / mixed program**            |
+|       5 | SYT4, PCDH15, BRINP3, SLC34A2    | Strongly neural (SYT4, PCDH15, BRINP3) + SLC34A2 (EMT-ish)       | **Neural-like / quiescent**           |
+|       6 | PRLR, CRYBA2, HCN1, COL14A1      | HCN1 (neuronal) + COL14A1 (ECM) + S-phase-enriched cluster       | **Hybrid neural–mes / proliferative** |
+|       7 | DMRT2, UNC13C, CCDC26, CA8       | Developmental TF (DMRT2) + neural/synaptic (UNC13C, CA8)         | **Developmental / neural-leaning**    |
+|       8 | CENPF, MKI67, HIST1H2BN, HMMR    | Classic proliferation genes (Ki67, CENPF, histone, HMMR): G2M    | **Highly proliferative**              |
+
+
+*CELL CYCLE STAGES*<br>
+0: G1, WEAK MES<br>
+1: S, MODERATE MES<br>
+2: G2/M, AMBIGUOUS<br>
+3: mixed, NEURAL-LIKE<br>
+4: mixed, AMBIGUOUS<br>
+5: G1, WEAK NEURAL<br>
+6: S, WEAK MES<br>
+7: mixed, AMBIGUOUS<br>
+8: G2/M, WEAK NEURAL<br>
+
+Proliferative: 1,2,6,8<br>
+Low proliferation: 0,5<br>
+Mixed: 3,4,7<br>
+
+--- 
+Confident programs:<br>
+3: mixed, neural-like<br>
+1: S, moderate mes<br>
+
+Program exists, but weaker (remember this is all relative to other clusters):<br>
+- weaker but not necessarily totally ambiguous(?)<br>
+- provisionally labelled<br>
+
+0: G1, weak mes<br>
+5: G1, weak neural<br>
+6: S, weak mes<br>
+8: G2/M, weak neural<br>
+
+Ambiguous:<br>
+2: G2/M, ambiguous<br>
+4, mixed, ambiguous<br>
+7: mixed, ambiguous<br>
+
+
+After feature plots and violin plots of some DEG markers:
+
+Cluster 0 – identity markers: FBXO32, ITGBL1, TRIM22<br>
+Cluster 1 – identity: CAMK4, FAM111B; proliferation: E2F2<br>
+Cluster 2 – mitotic markers: PIF1, PSRC1, ARHGAP11B<br>
+Cluster 3–7 – identity markers as listed<br>
+Cluster 8 – proliferation markers: MKI67, CENPF, HIST1H2BN, HMMR
+
+
+
+
+## Mon Mentor Mtg
+After meeting with Kobe and showing annotations:
+
+
+1. Take the gene sets from the HOXD13 paper I was referring to and MSigDb and create module scores (AddModuleScore()) <br>
+2. Compare module scores across all clusters <br>
+Use these scores to refine/validate the neural vs mesenchymal annotations
+
+3. Will give more justification to annotations especially in addition to gene set enrichment analysis and GO pathway analysis
+- still need to do GSEA and GO
+
+
+## Summary ##
+
+- used HOXD13/EWS::FLI1 axis to separate clusters into neural-like vs mesenchymal-like programs
+- cell cycle scoring to identify proliferative clusters
+- used cluster-specific top DEGs to verify cluster identity
+- combined 3 to assign final cluster annotations
+
+NEXT:<br>
+module scores<br>
+gene set enrichment analysis<br>
+go pathway
+
+compute module scores + run GSEA/GO to validate and refine cluster annotations, adjust labels if enrichment patterns disagree with the initial HOXD13/DEG/cell cycle assignments.
+
+
+Additional next steps:
+
+- Explore expression + accessibility of structural variant genes in scRNA-seq and scATAC-seq data
+    - Feature/violin plots
+- Gene set enrichment analysis
+- Improve/validate annotations by using GSEA + AddModuleScore()
+
+
+## Wed 11/19
+
+slurm script is not bgmp/tnair bound?
+
+so files were in home dir but not my bgmp dir<br>
+cp -r all files
+
+will eventually scancel job and relaunch apptainer after fixing run_rstudio script
+
+Tinkering around with the slurm script<br>
+
+need to bind the script to the right dir, right now it's set to home not project home<br>
+
+- this way can access easily on vs code as well and is in sarcoma dir
+- (technically can access ~ but this makes more sense ^)
+
+```bash
+cp -r /home/tnair/EwS/Seurat/. /projects/bgmp/shared/groups/2025/sarcoma/tnair/Seurat
+```
+In R studio console
+```r
+rstudioapi::openProject("~/EwS/Seurat")
+
+rstudioapi::openProject("/projects/bgmp/tnair/bioinfo/Bi624/scRNAseq/scrnaseq-assignment-thejesnair")
+```
+
+## Fri 11/21
+
+cluster_markers.rds
+
+Used for:<n>
+- GSEA
+- GO
+- KEGG
+- pathway enrichment
+- cluster annotation
+(because GSEA/GO require ranked gene lists, not cell-level matrices)
+
+Contains:
+
+- all DEGs per cluster
+- p-values, log2FC
+- everything needed for enrichment analysis
+
+
+integrated_seurat.rds
+
+Used for:
+
+- gene expression analysis of SV-affected genes
+
+- comparing expression across cell lines
+
+- comparing expression across clusters
+
+- UMAP/FeaturePlot/VlnPlot
+(because SV analysis needs actual expression values per cell)
+
+Contains:
+
+- full expression matrix
+
+- metadata
+
+- clusters
+
+- UMAP/PCA
+
+- integrated assay
+
+----
+
+- Vini is planning on looking at gene expression in genes containing structural variants
+    - Put integrated_seurat.rds obj in shared folder
+    - top 100 up/down regulated genes
+    - /projects/bgmp/shared/groups/2025/sarcoma/shared/Multiome
+
+## Sun-Mon, 11/24-11/25
+
+Recapping:
+
+What I've already done:
+1. integrated + clustered
+2. identifed top DEGs per cluster (up + down)
+3. HOXD13 based neural/mesenchymal programs (Apfelbaum et al. 2022)
+4. Added cell-cycle scoring: G1, S, G2/M
+5. Combined HOXD13, cell-cycle stages
+6. Tried validating a few markers to see expression across clusters
+
+So annotations are a good starting point but want to support/validate approach so it's justified
+
+- quantitative confirmation?
+
+- Module scores (using AddModuleScore())
+    - MSigDb
+- GSEA
+- GO enrichment
+    - GSEA + GO makes sure that cluster labels align w/ known pathways
+
+This will help 
+- confirm neural/mesenchymal programs
+- reveal hidden programs?
+- resolved ambiguous clusters?
+
+--- 
+
+What I need to do next:<br>
+1. Add module scores
+2. Plot module scores along UMAPs
+3. Run GSEA + GO enrichment
+4. Refine annotation table
+5. Create final UMAPs
+
+Notes:
+- Had to redo CellCycleScoring, I think the integratedCCA was the default.
+    - integratedCCA has the corrected values (won't give us biological meaning)
+- cell-cycle gene sets need to be evaluated on real expression (biological scoring)
+
+
+- Plots didn't change
+- Cell cycle staging values didn't change.
+- Default set to GeneExpressionMatrix for cell-cycle staging, then changed back to integratedCCA when making labelled umaps (HOXD13 + phase)
+
+---
+### MSigDb
+
+[MSigDb](https://www.gsea-msigdb.org/gsea/msigdb/)
+
+[Collections](https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp#H)<br>
+- Hallmark gene sets
+    - EMT (epithelial mesenchymal transition)
+        - process involved in many things including metastasis
+        - when epithelial cells gain migratory, mesenchymal features
+    - G2M checkpoint
+        - proliferation markers (mitotic activity)
+    - E2F
+        - targets E2F transcription factors
+        - EWS::FLI interact with E2F tf
+        - E2F: S-phase entry
+- Gene ontology gene sets (C5)<br>
+from HOXD13 paper:<br>
+
+UP
+- GO_NEUROGENSIS
+- GO_NEURON_DIFFERENTATION
+- GO_NEURON_DEVELOPMENT
+- GO_NEURON_PROJECTION (?)
+
+DOWN
+- GO_CELL_JUNCTION_ORGANIZATION
+- GO_BIOLOGICAL_ADHESION
+- GO_CELL_SUBSTRATE_AHDESION
 
