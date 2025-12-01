@@ -612,3 +612,29 @@ In most cell lines, there was evidence of actual fusions; however, the majority 
 HIVEP3 - https://www.ncbi.nlm.nih.gov/gene/59269 
 
 SUCLA2 - https://www.ncbi.nlm.nih.gov/datasets/gene/8803/ 
+
+# Monday, December 1st
+
+## Methylation continued
+
+Making a Nextflow script to use SamTools to subset the haplotagged bam files to regions of interst
+
+EWSR1
+RS_2025_08	current	GRCh38.p14 (GCF_000001405.40)	22	NC_000022.11 (29268268..29300521)
+
+RS_2025_08	current	GRCh38.p14 (GCF_000001405.40)	11	NC_000011.10 (128685132..128813267)
+
+Subset to Chromosome 22 29200000 -> 29400000
+
+Chromosome 11 128500000 -> 128900000
+
+```
+samtools --version
+# samtools 1.22.1
+nextflow -v
+# nextflow version 25.10.2.10555
+```
+
+Created a Nextflow script called subsetregion.nf to subset the BAM files to regions of interest 
+
+Copying the directory to the EWSProject directory
