@@ -730,7 +730,7 @@ DOWN
 - GOBP_CELL_MIGRATION
 - GOBP_MESENCHYME_DEVELOPMENT
 
-note: need to double check these are the final gene sets i used, will update later.
+
 
 https://satijalab.org/seurat/reference/integratedata
 https://satijalab.org/seurat/articles/seurat5_integration
@@ -777,3 +777,114 @@ Apptainer container is missing system libraries (zlib.h)<br>
 So then other libraries cannot be installed. clusterProfiler and all its dependencies failed to install, even when using personal R library path. I would have to rebuild container or use a module with Bioconductor preinstalled.
 
 Easier to just work locally, which is fine because computationally intensive work is already finished.
+
+## Sun-Mon, 11/30-12/1
+
+cluster annotations<br>
+neural:
+- genes involves in neurons
+- synaptic signaling
+- neuronal differentiation
+- neural maturation
+
+clusters: 3,5
+
+neural-crest:
+- different than neural program
+- early developmental genes
+- progenitor-like genes
+
+cluster: 7
+
+mixed neural/mes:
+- not strongly lineage specific
+- both neural-like and mesenchymal-like DEGs present
+
+cluster: 6
+
+* if we look at the heatmap the profiles of 6 and 7 look similar
+
+remember:
+- heatmap is using those GO pathways, so captures broad pathway activity, but doesnt necessarily specifiy lineage-defining marker genes
+- 7 expresses neural-crest and developmental regulators (DMRT2, UNC13C, CA8), supporting a neural crest-like identity
+- 6 shows a mix of weak neural, mesenchymal, and proliferative genes. 
+
+So, final annotations integrate both pathway-level signals and specific marker genes
+
+
+FINAL ANNOTATIONS
+
+| Cluster | Final label                             |
+| ------- | --------------------------------------- |
+| 0       | Stress-like                             |
+| 1       | Mesenchymal-like                        |
+| 2       | Mesenchymal-like (highly proliferative) |
+| 3       | Neural-like                             |
+| 4       | Stress-like                             |
+| 5       | Neural-like                             |
+| 6       | Mixed neural/mes                        |
+| 7       | Neural crest-like                       |
+| 8       | Highly proliferative                    |
+
+| Cluster | Final label                             | Proliferation tier |
+| ------- | --------------------------------------- | ------------------ |
+| 0       | Stress-like                             | Low                |
+| 1       | Mesenchymal-like                        | High               |
+| 2       | Mesenchymal-like (highly proliferative) | Very high          |
+| 3       | Neural-like                             | High               |
+| 4       | Stress-like                             | Intermediate       |
+| 5       | Neural-like                             | Low                |
+| 6       | Mixed neural/mes                        | High               |
+| 7       | Neural crest-like                       | Intermediate       |
+| 8       | Highly proliferative                    | Very high          |
+
+
+
+
+(primary) marker genes = what the cluster is defined by
+(secondary) module scores = what major program the cluster is running
+(tertiary) GO = broad context
+
+### Module Score Summary (per cluster)
+
+Columns:
+- HOXD13_neural (Apfelbaum neural-like program)
+- HOXD13_mes (Apfelbaum mesenchymal-like program)
+- G2M (G2/M checkpoint)
+- E2F (DNA replication / E2F targets)
+- EMT (Hallmark EMT)
+
+Cluster | HOXD13_neural | HOXD13_mes | G2M     | E2F      | EMT
+--------|----------------|-------------|---------|----------|---------
+0       | –0.077         | +0.052      | +0.001  | –0.069   | +0.022
+1       | –0.106         | +0.030      | +0.182  | +0.176   | +0.004
+2       | –0.122         | +0.077      | +0.265  | +0.174   | +0.019
+3       | +0.097         | –0.143      | +0.149  | +0.134   | –0.033
+4       | –0.054         | –0.013      | +0.110  | +0.049   | +0.016
+5       | –0.079         | +0.035      | –0.015  | –0.085   | –0.015
+6       | –0.023         | –0.141      | +0.197  | +0.184   | –0.056
+7       | –0.025         | –0.112      | +0.108  | +0.097   | –0.044
+8       | –0.023         | –0.081      | +0.229  | +0.199   | +0.020
+
+- cluster 3, strongly positive neural program
+- cluster 5, neural from DE marker genes, shows weaker program activation, lower (negative) proliferation scores
+- clusters 2,8: strong positive G2M/E2F and DE markers are cell cycle assoc.
+- clusters 1,6,3: strong proliferation, but not cell-cycle identity
+- cluster 4: stress-like, mod proliferation
+- cluster 7: neural crest-like, mod proliferation
+- cluster 0: stress like, low prolif
+- cluster 5: neural-like, lowest proliferation amongst all clusters (negative values)
+
+
+### saved integratd obj with final annotations as 'seurat_integration_finalannotations.rds'
+
+size: 3.2G<br>
+contains all assays/layers/modules
+
+### saved rna-assay only integrated obj as 'seurat_rna_only_forGSEA_GO.rds'
+For GO/GSEA analyses, I only need RNA assay and annotations, so saving another object so I can work on these tasks locally
+
+size: 342M<br>
+
+
+cancelled slurm-apptainer job (39767942) since all computationally intensive steps (integration, clustering, marker identification, annotation...) are complete; remaining analyses will be done locally
