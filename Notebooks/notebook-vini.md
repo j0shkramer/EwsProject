@@ -1,145 +1,175 @@
 # Lab Notebook
 
-# File Storage
+# Project Goal
 
-- vcf files for each cell line are located in `/projects/bgmp/shared/groups/2025/sarcoma/shared/250711_lewings_lines/pacbiowdlR/`
+- Explore relationships between chromatin structure, cis-regulatory element usage, and transcriptional states in EwS to better understand heterogeneity
 
-# Week 4
+# Set Up & File Storage
 
-- We created a list of genes that, based on literature, may be associated w/ EwS:
- https://docs.google.com/spreadsheets/d/1eYBbficB6rVrvqe-5xCBs-dhWAPUE2pI4mQhDDZ0H7M/edit?gid=0#gid=0
+## GitHub
 
-### BED File Creation
+[https://github.com/j0shkramer/EwsProject](https://github.com/j0shkramer/EwsProject)
 
-- Created a .bed file from list of collected genes, containing chromosome and position information for each gene
+- cloned on my laptop at `~/bioinfo/Bi624/EwS_Project/EwsProject`
+- cloned on Talapas at `/projects/bgmp/shared/groups/2025/sarcoma/vini/EwsProject`
 
-> Rmd file: `GenerateBED.Rmd`
-> 
-- Installation of biomaRt:
+## My Computer
+
+- project directory is `~/bioinfo/Bi624/EwS_Project`
+
+## Talapas
+
+- group project directory is `/projects/bgmp/shared/groups/2025/sarcoma/`
+- structural variant (`.vcf`) files for each cell line are located at: `/projects/bgmp/shared/groups/2025/sarcoma/shared/250711_lewings_lines/pacbiowdlR/`
+- conda environment: ews_project
+    - python version: 3.14.0
+    - installed packages:
+        - pandas: 2.3.3
+        - numpy: 2.3.5
+        - more-itertools: 10.8.8
+
+### Accessing RStudio
+
+- this was set up by running `run_rstudio_prod-v04.sh` w/ `sbatch`
+    - script located at `/projects/bgmp/shared/groups/2025/sarcoma/vini`
+    - will have to run again every 30 days
+    - slurm log files located at `/projects/bgmp/shared/groups/2025/sarcoma/vini/rstudio_runs`
+1. run this command on local machine:
     
     ```bash
-    if (!require("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    
-    BiocManager::install("biomaRt")
+    ssh -L 49615:localhost:48913 vini@login3.talapas.uoregon.edu -t ssh -L 48913:localhost:49615 n0350.talapas.uoregon.edu
     ```
     
-- Created BED file + changed names of chromosomes to match format observed in .vcf files:
+2. log in w/ UO credentials
+3. open web browser to:
+    
+    [http://localhost:49615/](http://localhost:49615/)
+    
+4. log in credentials:
+    - username: vini
+    - password: changeme123
+
+# Structural Variant Annotation
+
+- all files for this section are located on Talapas at `/projects/bgmp/shared/groups/2025/sarcoma/vini/variant_annotation`
+
+## Selection of Annotation Tool
+
+- researched options for adding gene names (annotation) to each variant in vcf files: bcftools and ANNOVAR
+    - ANNOVAR was selected because
+        - it comes with pre-built reference databases
+        - it has more detailed output
+        - seems pretty popular (paper has 15000+ citations)
+            
+            [ANNOVAR: functional annotation of genetic variants from high-throughput sequencing data](https://pmc.ncbi.nlm.nih.gov/articles/PMC2938201/)
+            
+
+### Installation & Set-Up
+
+- installation of ANNOVAR:
+    
+    [Quick Start-Up Guide - ANNOVAR Documentation](https://annovar.openbioinformatics.org/en/latest/user-guide/startup/#download-and-install)
+    
+    - had to enter name, institution, and email to download
+    - was emailed a download link, from which I downloaded annovar.latest.tar.gz
+    - transferred tar.gz file to Talapas using scp + extracted it using tar -xvzf
+- downloading most recent version of hg38 human genome (not sure if this was necessary but did it anyway):
+    
+    [Download ANNOVAR - ANNOVAR Documentation](https://annovar.openbioinformatics.org/en/latest/user-guide/download/#additional-databases)
     
     ```bash
-    zcat A4573.GRCh38.structural_variants.phased.vcf.gz | grep -v "^#" | cut -f 1 | sort | uniq -c | sort -rn
-    
-    3948 chr2
-    3890 chr1
-    3118 chr7
-    3062 chr6
-    3032 chr5
-    2928 chr3
-    2761 chr4
-    2484 chr12
-    2457 chr11
-    2427 chr8
-    2101 chrX
-    1978 chr9
-    1884 chr10
-    1762 chr17
-    1721 chr13
-    1554 chr14
-    1522 chr18
-    1495 chr16
-    1493 chr15
-    1426 chr20
-    1259 chr19
-    1107 chr22
-    1101 chr21
-    50 chr22_KI270737v1_random
-    42 chrUn_KI270438v1
-    32 chr2_KI270715v1_random
-    27 chrUn_KI270442v1
-    25 chrY
-    25 chr22_KI270738v1_random
-    23 chr16_KI270728v1_random
-    21 chrUn_GL000224v1
-    20 chr22_KI270736v1_random
-    20 chr17_KI270729v1_random
-    18 chr1_KI270712v1_random
-    15 chr14_GL000225v1_random
-    15 chr14_GL000009v2_random
-    14 chr17_GL000205v2_random
-    13 chrUn_KI270538v1
-    13 chr22_KI270733v1_random
-    13 chr17_KI270730v1_random
-    12 chrUn_GL000219v1
-    12 chrUn_GL000195v1
-    12 chr14_GL000194v1_random
-    11 chrUn_KI270467v1
-    11 chr4_GL000008v2_random
-    11 chr15_KI270727v1_random
-    11 chr14_KI270725v1_random
-    10 chr3_GL000221v1_random
-    9 chrUn_GL000220v1
-    9 chr1_KI270709v1_random
-    8 chr9_KI270719v1_random
-    8 chr22_KI270734v1_random
-    7 chrUn_KI270466v1
-    7 chr22_KI270731v1_random
-    7 chr14_KI270723v1_random
-    6 chr22_KI270732v1_random
-    5 chr5_GL000208v1_random
-    5 chr2_KI270716v1_random
-    5 chr14_KI270724v1_random
-    5 chr14_KI270722v1_random
-    4 chrUn_KI270741v1
-    4 chrUn_KI270589v1
-    3 chrUn_KI270747v1
-    3 chrUn_KI270435v1
-    3 chrM
-    3 chr1_KI270713v1_random
-    2 chr9_KI270718v1_random
-    2 chr22_KI270735v1_random
-    2 chr1_KI270707v1_random
-    1 chrUn_KI270751v1
-    1 chrUn_KI270591v1
-    1 chrUn_KI270588v1
-    1 chrUn_KI270519v1
-    1 chrUn_KI270518v1
-    1 chrUn_KI270507v1
-    1 chrUn_GL000214v1
-    1 chr9_KI270720v1_random
-    1 chr9_KI270717v1_random
-    1 chr1_KI270711v1_random
-    ```
-    
-- Removed all genes that fell on non-canonical chromosomes, because their names do not match non-canonical chromosomes in these .vcf files
-- Final .bed file: `EwSAscGenes.bed`
-    
-    ```bash
-    head EwSAscGenes.bed
-    
-    CDC20	chr1	43358928	43363207
-    JAK1	chr1	64833223	65067754
-    GNG5	chr1	84498284	84507237
-    ID2	chr2	8678845	8684461
-    MEIS1	chr2	66433452	66573898
-    DYNC1I2	chr2	171687409	171750158
-    FN1	chr2	215360440	215436120
-    IGFBP5	chr2	216672105	216695549
-    FEV	chr2	218981087	218985184
-    CUL3	chr2	224470150	224585397
+    perl annotate_variation.pl -buildver hg38 -downdb -webfrom annovar ensGene41 humandb/
     ```
     
 
-### Filtering vcf Files
+## Annotating Structural Variants
 
-- Created a test input file using data from `TC32.GRCh38.structural_variants.phased.vcf.gz`
+- preparing files for ANNOVAR:
+    - ANNOVAR cannot deal w/ fusion variants, hence these were removed from vcf files using `grep -v "BND"`
+- running ANNOVAR:
     
     ```bash
-    # adding headers
-    zcat TC32.GRCh38.structural_variants.phased.vcf.gz | grep -"^#" > vcf_filtering_test_input.vcf
-    
-    # adding ~100 lines from thoughout the .vcf file so that test file contains variants from most chromosomes
-    zcat TC32.GRCh38.structural_variants.phased.vcf.gz | grep -v "^#" | sed -n '1~600p' >> vcf_filtering_test_input.vcf
-    
+    perl annovar/table_annovar.pl <input_vcf.gz> annovar/humandb/ -buildver hg38 -out output/<output_prefix> -remove -protocol ensGene -operation g -nastring . -vcfinput -polish
     ```
     
-    - Modified test file so that some variants fall within genes in BED file
+    - annotated variants w/ Ensembl (not NCBI) gene names, as that is the format used within sc Seurat object
+- ANNOVAR output: 3 files
+    
+    ```bash
+    <output_prefix>.avinput
+    <output_prefix>.hg38_multianno.txt
+    <output_prefix>.hg38_multianno.vcf
+    ```
+    
+    - the `multianno.txt` file is most useful for us
+- wrote a bash script titled `run_annovar.sh` to loop through each cell line’s  `structural_variants.phased.vcf.gz` file and:
+    1. remove fusion variants
+    2. run ANNOVAR
+    3. add cell line name as a new column
+    4. aggregated all ANNOVAR output .txt files (from each cell ine) into a single file, `all_cell_lines_annovar_output.txt`
+    - this script was run on an interactive node and took a few minutes to run
+        - ANNOVAR gave a few warnings about some invalid alternative/reference alleles, but nothing concerning
+        - resulting file was 479761 lines (1 for every structural variant annotated + header line)
+- wrote a Python script (`extract_sv_info.py`) that parsed through `annovar_all_cell_lines_output.txt` + output a table (`ews_sv_genes.txt`) w/ the following format:
+    
+    
+    | gene | gene_type | cell_line | sv_type | sv_len |
+    | --- | --- | --- | --- | --- |
+    |  |  |  |  |  |
+    - script ran within a minute:
+        
+        ```bash
+        ./extract_sv_info.py -a all_cell_lines_annovar_output.txt -o ews_sv_genes.txt
+        ```
+        
+    - gene_type:
+        
+        ```bash
+        cat ews_sv_genes.txt | cut -d ',' -f 3 | sort | uniq -c
+        ```
+        
+        | gene type | frequency | notes |
+        | --- | --- | --- |
+        | intergenic | 406341 |  |
+        | intronic | 173884 |  |
+        | ncRNA_intronic | 84416 |  |
+        | upstream | 5610 | close to gene |
+        | ncRNA_exonic | 5369 |  |
+        | downstream | 5286 | close to gene |
+        | exonic | 3413 |  |
+        | UTR3 | 2899 |  |
+        | UTR5 | 835 |  |
+        | upstream;downstream | 395 |  |
+        | splicing | 86 |  |
+        | ncRNA_splicing | 37 |  |
+        | exonic;splicing | 9 |  |
+        | ncRNA_UTR5 | 6 |  |
+        | UTR5;UTR3 | 1 |  |
+    - sv_type:
+        
+        ```bash
+        cat ews_sv_genes.txt | cut -d ',' -f 5 | sort | uniq -c
+        ```
+        
+        | structural variant type | frequency |
+        | --- | --- |
+        | DEL | 312952 |
+        | INS | 337979 |
+        | DUP | 36090 |
+        | INV | 1566 |
+
+# Structural Variant Transcriptional Effects
+
+- working w/ integrated Seurat object in R
+    - but used original RNA assay, as DESeq2 should be run on raw counts
+- made summed (pseudo-bulk) counts for each cell line
+- ran DESeq2 for each cell line vs. the others
+- made list of structural variant genes unique to each cell line
+- determined percent of unique structural variants that are in differentially expressed genes list
+
+Next Steps:
+
+- filter for SVs that are longer than a certain threshold
+- KEGG & GO w/ genes
+    - GO is more comprehensive
+- module expression in Seurat
