@@ -124,7 +124,7 @@ breakpoints = variants %>%
   )
 
 ```
-```{r, fig.height=10, fig.width=10}
+```{r, fig.height=10, fig.width=15}
 genes_per_cellline_list = list(
   A673 = c(variants %>% filter(Cell_Line == "A673") %>% .$Gene),
   A4573 = c(variants %>% filter(Cell_Line == "A4573") %>% .$Gene),
@@ -141,11 +141,14 @@ data_list = fromList(genes_per_cellline_list)
 upset(data_list, 
       sets = c("A673", "A4573", "CHLA9","CHLA10","PDX305","RDES","SKNMC","TC32","TC71"),
       order.by = "freq",
-      number.angles = 0, point.size = 2, line.size = 1, 
+      number.angles = 0, point.size = 3, line.size = 1, 
       mainbar.y.label = "# of Shared Genes", sets.x.label = "# of Genes per Cell Line",
-      text.scale = c(1, 1.3, 1, 1, 2, 1))
+      sets.bar.color = "blue",
+      main.bar.color = "blue",
+      matrix.color = "blue",
+      text.scale = c(3, 1.5, 1.75, 1, 2, 1.5))
 ```
-```{r, fig.height=10, fig.width=10}
+```{r, fig.height=10, fig.width=15}
 variants$gene_and_variant = paste(variants$Gene, variants$Variant_Type, sep = ":")
 
 gene_and_variant_per_cellline_list = list(
@@ -164,9 +167,12 @@ data_list2 = fromList(gene_and_variant_per_cellline_list)
 upset(data_list2, 
       sets = c("A673", "A4573", "CHLA9","CHLA10","PDX305","RDES","SKNMC","TC32","TC71"),
       order.by = "freq",
-      number.angles = 0, point.size = 2, line.size = 1, 
-      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Varints in Genes per Cell Line",
-      text.scale = c(1, 1.3, 1, 1, 2, 1))
+      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Variants in Genes per Cell Line",
+      number.angles = 0, point.size = 3, line.size = 1, 
+      sets.bar.color = "blue",
+      main.bar.color = "blue",
+      matrix.color = "blue",
+      text.scale = c(3, 1.5, 1.75, 1, 2, 1.5))
 ```
 
 # Exploring other fusions: attempting to back up their legitimacy
