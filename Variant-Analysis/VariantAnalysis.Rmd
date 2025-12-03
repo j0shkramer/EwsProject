@@ -15,7 +15,7 @@ library(patchwork)
 # Generate the variants data frame
 
 ```{r}
-variants = read_tsv(file = "~//bioinfo/EwsProject/Variant-Anaylsis/variantspercellline.tsv")
+variants = read_tsv(file = "~/bioinfo/EwsProject/Variant-Analysis/variantspercellline.tsv")
 ```
 
 # Exploratory Data Anaylsis
