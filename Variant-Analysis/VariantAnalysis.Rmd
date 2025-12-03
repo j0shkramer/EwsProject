@@ -10,6 +10,7 @@ library(tidyverse)
 library(ggplot2)
 library(gt)
 library(patchwork)
+library(UpSetR)
 ```
 
 # Generate the variants data frame
@@ -123,6 +124,51 @@ breakpoints = variants %>%
   )
 
 ```
+```{r, fig.height=10, fig.width=10}
+genes_per_cellline_list = list(
+  A673 = c(variants %>% filter(Cell_Line == "A673") %>% .$Gene),
+  A4573 = c(variants %>% filter(Cell_Line == "A4573") %>% .$Gene),
+  CHLA9 = c(variants %>% filter(Cell_Line == "CHLA9") %>% .$Gene),
+  CHLA10 = c(variants %>% filter(Cell_Line == "CHLA10") %>% .$Gene),
+  PDX305 = c(variants %>% filter(Cell_Line == "PDX305") %>% .$Gene),
+  RDES = c(variants %>% filter(Cell_Line == "RDES") %>% .$Gene),
+  SKNMC = c(variants %>% filter(Cell_Line == "SKNMC") %>% .$Gene),
+  TC32 = c(variants %>% filter(Cell_Line == "TC32") %>% .$Gene),
+  TC71 = c(variants %>% filter(Cell_Line == "TC71") %>% .$Gene)
+)
+
+data_list = fromList(genes_per_cellline_list)
+upset(data_list, 
+      sets = c("A673", "A4573", "CHLA9","CHLA10","PDX305","RDES","SKNMC","TC32","TC71"),
+      order.by = "freq",
+      number.angles = 0, point.size = 2, line.size = 1, 
+      mainbar.y.label = "# of Shared Genes", sets.x.label = "# of Genes per Cell Line",
+      text.scale = c(1, 1.3, 1, 1, 2, 1))
+```
+```{r, fig.height=10, fig.width=10}
+variants$gene_and_variant = paste(variants$Gene, variants$Variant_Type, sep = ":")
+
+gene_and_variant_per_cellline_list = list(
+  A673 = c(variants %>% filter(Cell_Line == "A673") %>% .$gene_and_variant),
+  A4573 = c(variants %>% filter(Cell_Line == "A4573") %>% .$gene_and_variant),
+  CHLA9 = c(variants %>% filter(Cell_Line == "CHLA9") %>% .$gene_and_variant),
+  CHLA10 = c(variants %>% filter(Cell_Line == "CHLA10") %>% .$gene_and_variant),
+  PDX305 = c(variants %>% filter(Cell_Line == "PDX305") %>% .$gene_and_variant),
+  RDES = c(variants %>% filter(Cell_Line == "RDES") %>% .$gene_and_variant),
+  SKNMC = c(variants %>% filter(Cell_Line == "SKNMC") %>% .$gene_and_variant),
+  TC32 = c(variants %>% filter(Cell_Line == "TC32") %>% .$gene_and_variant),
+  TC71 = c(variants %>% filter(Cell_Line == "TC71") %>% .$gene_and_variant)
+)
+
+data_list2 = fromList(gene_and_variant_per_cellline_list)
+upset(data_list2, 
+      sets = c("A673", "A4573", "CHLA9","CHLA10","PDX305","RDES","SKNMC","TC32","TC71"),
+      order.by = "freq",
+      number.angles = 0, point.size = 2, line.size = 1, 
+      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Varints in Genes per Cell Line",
+      text.scale = c(1, 1.3, 1, 1, 2, 1))
+```
+
 # Exploring other fusions: attempting to back up their legitimacy
 
 ```{r}
@@ -139,10 +185,10 @@ breakpoints = variants %>%
   filter(Variant_Type == "Breakpoint")
 ```
 
+## HIVEP3 SUCLA2 Possible Fusion Only
 ```{r}
 breakpoints %>% 
   filter(Gene != "FLI1" & Gene != "EWSR1") %>% 
-  filter(Cell_Line == "TC71") %>% 
-  filter(Gene == "MCF2L")
-  filter(grepl("chr13",Variant_Info) == TRUE)
+  filter(Cell_Line == "A673" | Cell_Line == "CHLA10" | Cell_Line == "TC32") %>% 
+  filter(Gene == "HIVEP3" | Gene == "SUCLA2")
 ```
