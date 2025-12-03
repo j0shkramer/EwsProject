@@ -638,3 +638,22 @@ nextflow -v
 Created a Nextflow script called subsetregion.nf to subset the BAM files to regions of interest 
 
 Copying the directory to the EWSProject directory
+
+# Tuesday, December 2nd
+
+## Methylation continued again
+
+Counting the number of methylating bases, both 6mA and 5mC
+
+| Cell Line | FLI1 Wild Type | FLI1 Fusion | EWSR1 Wild Type | EWSR1 Fusion |
+|-----------|----------------|-------------|-----------------|--------------|
+| A673      |   No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference          |
+| A4573     | No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference          |
+| CHLA9     | No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| CHLA10    | No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| PDX305    | No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| RDES      | No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| SKNMC     |  No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| TC32      |  No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+| TC71      |  No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
+
