@@ -876,7 +876,7 @@ Cluster | HOXD13_neural | HOXD13_mes | G2M     | E2F      | EMT
 - cluster 5: neural-like, lowest proliferation amongst all clusters (negative values)
 
 
-### saved integratd obj with final annotations as 'seurat_integration_finalannotations.rds'
+### saved integrated obj with final annotations as 'seurat_integration_finalannotations.rds'
 
 size: 3.2G<br>
 contains all assays/layers/modules
@@ -888,3 +888,77 @@ size: 342M<br>
 
 
 cancelled slurm-apptainer job (39767942) since all computationally intensive steps (integration, clustering, marker identification, annotation...) are complete; remaining analyses will be done locally
+
+
+## Wed-Sun, 12/3-12/7
+
+Moved locally for GSEA, GO to verify annotations and determine pathways enriched in cell lines
+
+GO
+- Loaded seurat_rna_only_for_GSEA.rds into RStudio locally
+- Reran FindAllMarkers() to get DEGs for all 9 clusters (want logFC for both up and down)
+- Loaded cluster_markers.rds
+- visualized both up- and down-regulated pathways
+
+GSEA
+- Loaded sesurat_integration_finalAnnotations.rds
+- ran presto on Talapas Apptainer (had issues installing it locally)
+- saved obj as allmarkers_presto.rds, slimmed obj to what's needed for GSEA saved as deg_all_GSEA.rds
+
+
+GO/GSEA enriched pathways biologically make sense, many pathways are related to cell cycle, neural pathways, but overall it is aligned with that is expected
+
+final annotations are good as is
+
+## Thurs, Wed - 12/18, 12/24
+
+Switching focus to **CHLA9** and **CHLA10** cell lines (pre vs post induction chemotherapy treatment)
+
+info on cell lines:
+https://www.cellosaurus.org/CVCL_M150<br>
+https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-9_Cell_Line_Data_Sheet_COGcell_org.pdf<br>
+https://www.cellosaurus.org/CVCL_6583<br>
+https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-10_Cell_Line_Data_Sheet_COGcell_org.pdf<br>
+
+New .Rmd to do focused analysis and pivot to ATAC:
+
+Overall plan is to subset CHLA9, CHLA10 clusters--identify patterns in programs and DGE. Since data is already done shouldn't take too long
+
+Then will look at peak accessibility patterns between the two using ATAC data (Signac)
+
+Signac is basically an extension of Seurat package:
+
+"Signac is a powerful R/Bioconductor package for analyzing single-cell chromatin data, like scATAC-seq, extending the popular Seurat framework to handle genomic information for tasks such as peak calling, quality control, dimension reduction, clustering, and integration with gene expression data, enabling comprehensive single-cell genomics studies. It provides specialized data structures and functions to interpret DNA accessibility, identify cell types, analyze DNA motifs, and visualize results, facilitating multimodal single-cell research. "
+
+
+From Stuart lab website:
+https://stuartlab.org/signac/1.11.0/articles/faq
+
+"Signac is an extension of Seurat for the analysis of single-cell chromatin data (DNA-based single-cell assays). We have extended the Seurat object to include information about the genome sequence and genomic coordinates of sequenced fragments per cell, and include functions needed for the analysis of single-cell chromatin data."
+
+
+Assays of interest:
+ATAC, MotifMatrix
+
+- MotifMatrix contains information for transcription factor binding sites, this will definitely be something of interest to look into
+
+```r
+seurat_integration@assays
+
+
+$MotifMatrix
+Assay data with 870 features for 19737 cells
+First 10 features:
+ TFAP2B, TFAP2D, TFAP2C, TFAP2E, TFAP2A, ARID3A, ARID5B, ARID3B, ARID5A, ARID3C 
+
+
+$ATAC
+Assay data with 151181 features for 19737 cells
+First 10 features:
+ chr1-816894-817394, chr1-826681-827181, chr1-827324-827824, chr1-867479-867979,
+chr1-869628-870128, chr1-903837-904337, chr1-904515-905015, chr1-905191-905691,
+chr1-909896-910396, chr1-911064-911564 
+
+seurat_integration@reductions
+# no reductions for ATAC or MotifMatrix
+```
