@@ -6,17 +6,19 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
+library(data.table)
 library(ggplot2)
-library(gt)
+library(dplyr)
 library(patchwork)
 library(UpSetR)
+library(gt)
+library(tidyverse)
 ```
 
 # Generate the variants data frame
 
 ```{r}
-variants = read_tsv(file = "~/bioinfo/EwsProject/Variant-Analysis/variantspercellline.tsv")
+variants = fread(file = "~/bioinfo/EwsProject/Variant-Analysis/genecelllinevariant.tsv")
 ```
 
 # Exploratory Data Anaylsis
@@ -175,6 +177,18 @@ upset(data_list2,
       text.scale = c(3, 1.5, 1.75, 1, 2, 1.5))
 ```
 
+# Comparing CHLA9 and CHLA10
+```{r}
+upset(data_list2, 
+      sets = c("CHLA9","CHLA10"),
+      order.by = "freq",
+      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Variants in Genes per Cell Line",
+      number.angles = 0, point.size = 3, line.size = 1, 
+      sets.bar.color = "forestgreen",
+      main.bar.color = "forestgreen",
+      matrix.color = "forestgreen",
+      text.scale = c(1.5iinst, 1.5, 0.75, 1, 2, 1.5))
+```
 # Exploring other fusions: attempting to back up their legitimacy
 
 ```{r}

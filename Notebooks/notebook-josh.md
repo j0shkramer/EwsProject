@@ -657,3 +657,14 @@ Counting the number of methylating bases, both 6mA and 5mC
 | TC32      |  No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
 | TC71      |  No obvious difference        |     No obvious difference         |      No obvious difference            |     No obvious difference 
 
+# Saturday, December 27th
+
+## Exploring CHLA9 v. CHLA10
+
+Created UpSet Plot between the two cell lines
+
+Having errors installing packages in R (computer broke sad)
+
+Editting Nextflow script to subset haplotagged reads for the region of the SUCLA2 and HIVE3P jersey
+
+Created new directory called HIVE3P_SUCLA2_Fusion that is located on Talapas. It is also on my local computer but it's too large to upload to GitHub.
