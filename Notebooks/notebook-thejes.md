@@ -914,11 +914,11 @@ final annotations are good as is
 
 Switching focus to **CHLA9** and **CHLA10** cell lines (pre vs post induction chemotherapy treatment)
 
-info on cell lines:
-https://www.cellosaurus.org/CVCL_M150<br>
-https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-9_Cell_Line_Data_Sheet_COGcell_org.pdf<br>
-https://www.cellosaurus.org/CVCL_6583<br>
-https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-10_Cell_Line_Data_Sheet_COGcell_org.pdf<br>
+info on cell lines:<br>
+- https://www.cellosaurus.org/CVCL_M150<br>
+- https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-9_Cell_Line_Data_Sheet_COGcell_org.pdf
+- https://www.cellosaurus.org/CVCL_6583<br>
+- https://www.cccells.org/dl/EFT_Lines_DataSheets/CHLA-10_Cell_Line_Data_Sheet_COGcell_org.pdf<br>
 
 New .Rmd to do focused analysis and pivot to ATAC:
 
@@ -962,3 +962,352 @@ chr1-909896-910396, chr1-911064-911564
 seurat_integration@reductions
 # no reductions for ATAC or MotifMatrix
 ```
+
+## Thurs-x, 12/25-x
+
+### scRNA-seq
+Wrapped up scRNA analysis of CHLA9 vs CHLA10.
+No dramatic transcriptional state shifts between the two cell lines or cell cycle stages. Largely conserved states b/w two cell lines. Differences b/w cell lines driven mostly by changes in state proportions, rather than new transcriptional states. This is consistent with expected heterogeneity/plasticity.
+
+Within conserved states (Stress-like and Mesenchymal-like), differential expression analysis showed modest gene expression shifts between CHLA10 and CHLA9. This may be consistent with treatment associated reprogramming rather than transcriptional shifts. 
+
+Cell-cycle analysis supports this, CHLA10 displayed a shift towards G2/M stages (higher proliferation scores reflected in wider tail in violin plot), but overall distributions remained similar between the two cell lines.
+
+Post-treatment differences are generally quantitative (shifts in expression values instead of emergence of new states) and regulatory (changes in mechanisms controlling gene expression). This means further downstream analysis of regulatory features contributing to transcriptional shifts is necessary--start by looking at scATACseq data.
+
+
+### scATAC-seq
+
+----
+### SOFTWARE VERIONS
+
+
+Signac 1.16.0<br>
+biovizBase 1.56.0<br>
+(biovizBase install updated Seurat)<br>
+Seurat 5.4.0<br>
+
+----
+
+ATACseq measures whether genomic regions (peaks) are accessible (open) or not in individual cells. Differential accessibility (DA) looks at the probabilityt hat a region is open between two different conditions (CHLA9 vs CHLA10)
+
+ATAC data is influenced by sequencing depth so DA (for our purposes) can be performed using logistic regression (vignette does wilcox but LR is another option as well--depends on the question). LR will model binary-like outcomes (open vs closed) and allows inclusion of covariates.
+
+Covariates: variable used in statistical modeling to account for factors that may infuence chromatin accessibility, but not the primary experimental variable being studied
+
+nFeature_ATAC:<br>
+- Number of distinct peaks that are accessible (non-zero) in a cell<br>
+- *How many regions of the genome appear accessible in this cell?*
+- "complexity/breadth of accessibility"
+
+nCount_ATAC:<br>
+- Total number of ATAC fragments (counts) per cell that contributes to peak matrix
+- *How deeply was this cell sequenced? How much chromatin accessibility signal does it have overall?*
+- "library depth for ATAC"
+
+Example:
+| Cell | nCount_ATAC | nFeature_ATAC |
+| ---- | ----------- | ------------- |
+| A    | high        | low           |
+| B    | low         | high          |
+
+Cell A: a few peaks, very strong signal
+
+Cell B: many peaks, weak signal
+
+[Signac vignette, 'Analyzing PBMC scATAC-seq'](https://stuartlab.org/signac/articles/pbmc_vignette.html)
+
+[Single-cell chromatin state analysis with Signac, Stuart et al.](https://stuartlab.org/pdf/Single-cell%20chromatin%20state%20analysis%20with%20Signac.pdf)
+
+Using nCount_ATAC for DA: testing if a peak is more accessible in CHLA10 vs CHLA9 after accounting for sequencing depth per cell
+
+- important to take sequencing depth into account bc need correction, dont want false positives
+
+Using LR over Wilcox because want to account for technical variation (noise) and see if cell line contributes/explains accessibility differences. Wilcoxon would be appropriate for groups that are already biologically different (vignette does naive CD4 vs CD14 monocytes), but we're comparing isogenic cell lines
+
+*Significant peaks found would represent genomic regions whose accessibility differs between CHLA10 and CHLA9* ***independent of sequencing depth*** *, suggesting treatment-associated regulatory changes*
+
+---
+After running DA, want to draw connections between peaks and genes, pathways, TF...
+
+*Which genes/programs that change in RNA expression also have associated regulatory changes in chromatin structure (ATAC)?*
+
+Want to utilize GeneScoreMatrix to connect regulatory changes to gene activity
+
+**GeneScoreMatrix:** a per-cell "predicted gene activity" from ATAC, created by computing the aggregated signal in and around each gene (promoter/gene body +/- surrounding window), gene-level accessibility proxy
+
+*Based on chromatin accessibility near this gene, how active does this gene appear to be?*
+
+https://star-protocols.cell.com/protocols/4342 (possible resource?)
+
+| Data                 | Biological origin             | Seurat container |
+| -------------------- | ----------------------------- | ---------------- |
+| GeneExpressionMatrix | RNA                           | Assay            |
+| ATAC                 | Chromatin accessibility       | Assay   |
+| GeneScoreMatrix      | ATAC-derived (gene-level) | Assay            |
+| MotifMatrix          | ATAC-derived (TF-level)       | Assay            |
+
+Information above is still correct, ***HOWEVER***<BR>
+
+ATAC data is present as peak-by-cell matrix, the assay is stored as standard Seurat assay and not a Signac ChromatinAssay, so genomic annotations and fragment-level information is not embedded. Peak-to-gene mapping has to be performed externally (GenomicRanges)
+
+----
+### External: peak -> gene annotation w/ GenomRanges -> overlap with RNA DEGs
+
+https://www.biostars.org/p/425561/
+https://rdrr.io/bioc/ensembldb/f/vignettes/coordinate-mapping.Rmd
+
+Need to find genomic coordinates: EnsDb
+
+- "gene-centric"
+- fundamentally for genomic coordinates, gives precise gene, transcript, and exon locations
+- fxns to map b/w genomic, transcript, and protein coordinates
+- EnsDb contains more detailed information than TxDb, including gene symbols, Entrez IDs, GC content, gene/transcript biotypes, and protein annotations
+
+
+Gene annotation performed using Ensembl-based EnsDb (hg38) for gene-centric interpretations of chromatin DA. (including non-coding and regulatory genes relevant to transcriptional regulation)
+
+Note:<BR>
+
+Remember, hg38 is the Genome Reference Consortium Human Build 38, which is the most current/accurate reference map of the human genome
+
+
+BiocManager::install("biovizBase")<br>
+biovizBase is a dependency needed to use EnsDb, GetGRangesFromEnsDb() requires it
+
+While nearest-gene mapping provides a useful first approximation, regulatory elements can act over long genomic distances. Interpret peak-to-gene associations as suggestive instead of definitive and complement analysis with motif-level and gene-activity approaches.
+
+DA results:
+
+| More open in CHLA9 | More open in CHLA10 | 
+|---|--- |
+| 254 | 909 | 
+
+There are ~3.5x more peaks **OPEN** in CHLA10 vs CHLA9!
+
+Post-treatment cells show widespread chromatin opening:
+- consistent with regulatory rewiring
+- stress/adaptive programing
+- altered transcriptional control
+
+matches what seen earlier with shifts in proportions and expression(?)
+- for example the cell cycle shifting, heterogeneity in proliferation scores
+
+
+RNA differential expression analysis was restricted to dominant stress-like and mesenchymal-like transcriptional programs to maintain interpretability and statistical power. 
+
+ATAC-seq differential accessibility was performed across all cells, revealing regulatory changes spanning multiple cell states. A substantial subset of accessibility changes overlapped with RNA DEGs, particularly protein-coding genes, while additional ATAC-only changes likely reflect regulatory priming OR activity in other transcriptional programs not explicitly modeled in RNA analysis.
+
+
+DA analysis did reveal some further information however I think that nearest-gene mapping alone isn't enough. 
+
+1. gene-centric view:<br>
+- which genes show both RNA change and nearby accessibility change
+    - ranked table?
+
+2. Motif enrichment analysis (TF) will be a major next step of analysis:
+- *Which transcription factors could explain these accessibility changes?*
+
+
+3. Fiber-seq integraiton:
+- validate chromatin architecture changes
+- nucleosome positioning/footprinting differences
+- mechanistic support beyond open/closed accessibility
+
+Important biology isn't just w/i changed regions of accessibility: important to look at WHICH genes, WHICH tfs, WHICH chromatin features
+
+This is just a good initial look into what's happening
+
+Good figures potentially:
+1. peak -> gene -> tf
+    - motif enrichment showing specific TFs (anything EWS-FLI1 related for example, or other EMT TFs)
+    - directionality, more open in CHLA10 vs CHLA9
+2. gene level convergence
+    - ranked list or heatmap of genes
+        - RNA DEGs AND nearby DA peaks
+        - plus interpretation (stress, mes)
+3. **chromatin architecture support**
+    - fiber-seq evidence that regions near key genes show altered nucleosome patterns
+
+---
+### SUMMARY
+
+1. Performed differential chromatin accessiblity (DA) analysis between CHLA9 and CHLA10 using Signac (in Seurat)
+2. Used logistic regression with nCount_ATAC as a covariate to control for sequencing depth.
+3. Identified differentially accessible peaks, with clear directionality
+    - avg_log2FC > 0 -> more open CHLAA9
+    - acg_log2FC < 0 -> more open in CHLA10
+4. Mapped DA peaks to nearest genes using genomic coordinates (EnsDb, hg38)
+
+***Takeaways***
+
+1. Treatment associated regulatory changes do exist
+    - seen in both scRNA and scATAC DA data
+    - genomic regions change accessibility b/w pre and post treatment states
+    - *suggests that treatment alters chromatin regulation not just RNA abundance*
+2. Partial coupling b/w ATAC and RNA
+    - roughly half of DA peaks map near genes that are also RNA DEGs
+    - other half like represent:
+        - distal enhancers
+        - regulatory regions affecting genes NOT cpatured in the RNA DEG sets examined (stress-like, mesenchymal-like)
+        - genes active in other transcriptional programs beyond those analyzed
+3. nearest gene mapping is informative BUT limited
+    - nearest gene overlap is useful information as an initial look into biological bridge
+    - does not fully explain regulatory mechanisms, especially considering:
+        - enhancers can act at long distances
+        - multiple genes may be regulated by a single region
+        - TF-mediated regulation may not produce 1:1 peak gene correspondence
+
+
+### Post treatment differences appear primarily regulatory rather than compositional (i.e. shifts in chromatin accessibility and expression levels instead of new cell states)
+
+---
+
+Very early on in project I thought integration scRNA + scATAC datasets would be important but based on results I do not think this would be informative or contribute additionally meaningful data.
+
+I think primary focus should shift to what was mentioned earlier: gene-centric convergence, motif enrichment, and continued fiber-seq analysis
+
+
+### Easy break down moving forward
+
+Peaks: where change is occurring<br>
+- scATAC DA
+- genomic coordiantes
+- which regions of chromatin change accessibility after treatment
+
+GeneScoreMatrix: what is changing<br>
+- gene-level proxy dervied from ATAC
+- bridges peaks -> genes
+- can comapre RNA DEGs
+- which genes are likely affected by regulatory changes? not just rna expression but regualtory potential
+- reflects the regulatory potential of genes, integration of scATAC and scRNA results
+
+MotifMatrix: who is changing<br>
+- TF binding motifs
+- TF-centric interpretation
+- moving from regions -> regualtors
+- which TF can explain these changes?
+
+Fiber-seq: how changes are occuring<br>
+- nucleosome positioning
+- footprinting
+- chromatin architecture
+- what physical mechanism is underlying accessibility changes?
+- not just open vs closed by *how chromatin is reorganized*
+
+
+--------
+
+so my plan is:
+- gene-centric convergence
+    - RNA DEGs <-> genescorematrix <-> DA peaks
+- motif enrichment*
+    - identify candidate TFs drivinga ccessibility changes
+- synthesis
+    - genes -> regulators -> hypothesis
+
+connecting transcriptional change to regulatory mechanisms
+
+*let Vini or Josh take this on? Briefly spoke last meeting that maybe Vini could do
+
+-----------
+
+Summarizing again because I'm still confused by the nuance:
+
+1. RNA data (GeneExpressionMatrix)
+    - is this gene more expressed in CHLA9 or CHLA10?
+
+2. ATAC peaks (ATAC)
+    - Is this specific DNA region more open in CHLA9 or CHLA10?
+
+3. GeneScoreMatrix (ATAC -> gene)
+    - Is the chromatin around this gene more permissive in CHLA9 or CHLA10?
+(regulatory potential, not expression)
+    - aggregates ATAC signal across a window around a gene
+    - promoter, gene body
+    - collapses many peaks into one gene level value
+    - so ATAC-derived BUT gene-centric
+
+
+The whole reason we're looking at genescorematrix is to look at the area AROUND the open region of chromatin and determine how permissive it is (is the area open and accessible for the cell to turn that gene on??), then we can compare to the actual RNA DEG results and see if there's overlap and agreement 
+
+-------
+
+### Outputted files
+
+scRNA of CHLA9 vs CHLA10
+1. DEG_CHLA9_vs_CHLA10_StressLike_all.csv
+    - also did top50, but kind of redundant
+2. DEG_CHLA9_vs_CHLA10_MesenchymalLike_all.csv
+    - also did top50
+
+scATAC DA
+1. **DA_peaks_CHLA9_vs_CHLA10_scATAC.csv**
+    - contains ATAC peaks
+    - good for motif enrichment, fiber-seq follow up
+    - BED export? (subset of peaks for ^ motif enrichment: HOMER, MEME)
+
+    - *can do motif enrichment, fiber-seq follow up, SV overlap, enhancer analysis...*
+2. **DA_peaks_CHLA9_CHLA10_annotated nearest_gene.csv**
+    - same DA peaks
+    - annotated with NEAREST GENE, added biological context
+
+    - candidate target genes
+    - *choose loci for fiber-seq inspection, compare regulatory distances distributions?*
+    - *promoter-proximal vs distal peaks?*
+3. **GeneScore_DEG_CHLA9_vs_CHLA10.csv**
+    - GeneScore differential analysis
+    - gene-level ATAC signal
+    - answers q "is chromatin around gene more accessible in CHLA9 vs CHLA10"
+    - bridges gap b/w peaks and genes
+    
+    - *identify genes with regulatory potential changes*
+    - *compare with RNA DEGs, DA peak annotations*
+    - *focused motif analysis on genes with GeneScore changes?*
+    - *transcriptional regulators vs structural genes?*
+
+4. ConvergentGENES_RNA_GeneScore_CHLA9_vs_CHLA10.csv
+    - RNA and GeneScore convergence
+    - genes that satisfy both RNA DEG and GeneScore DEG
+    - expression change AND permissive chromatin
+5. **CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv**
+    - KEY file
+    - genes in this file are:
+        1. differentially expressed (RNA)
+        2. differential chromatin permissiveness (GeneScore)
+        3. at least one nearby differentially accessible peak
+    - answers q "Which genes are most likely under true regulatory control POST treatment"
+    - went from ~4000 genes from the convergent file to ~457
+
+    - *focused fiber-seq analysis on specific loci*
+    - *specific genes for motif enrichment?*
+    - *cross check w/ known EwS genes*
+    - *prioritize genes from this list for focus?*
+
+* note when i was putting plots into microsoft ppt for team update had to use .svg, for some reason .png was looking blurry even with increased dpi (even though it's worked previously)
+
+
+*Highlighted files used for downstream analyses?*
+
+---
+
+## What's next?
+
+### Motif enrichment
+- Goal: Identify TF motifs enriched in DA peaks (CHLA9 vs CHLA10)
+- Input files:
+    - DA_CHLA9_vs_CHLA10_scATAC.csv
+    - DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv
+- Enriched motifs that are potentially contributing to post-treatment accessibility changes?
+### Fiber-seq follow up
+- Goal: Validate regulatory architecture differences for top selected loci
+- Input file:
+    - CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv (containing 457 “high-priority” genes)
+- Chromatin architecture differences at loci of interest?
+### SV
+- Goal: see whether DA peaks/convergent genes are near SV or altered regulatory regions
+- Focus on loci where SV + motif + DA + RNA DEG overlap?
+- Input files:
+    - DA_peaks_CHLA9_vs_CHLA10_scATAC.csv
+    - CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv
+    - Generate BED files from chr locations in ^ files
