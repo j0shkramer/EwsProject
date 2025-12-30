@@ -963,7 +963,7 @@ seurat_integration@reductions
 # no reductions for ATAC or MotifMatrix
 ```
 
-## Thurs-x, 12/25-x
+## Thurs-Mon, 12/25-29
 
 ### scRNA-seq
 Wrapped up scRNA analysis of CHLA9 vs CHLA10.
@@ -1255,7 +1255,7 @@ scATAC DA
     - candidate target genes
     - *choose loci for fiber-seq inspection, compare regulatory distances distributions?*
     - *promoter-proximal vs distal peaks?*
-3. **GeneScore_DEG_CHLA9_vs_CHLA10.csv**
+3. GeneScore_DEG_CHLA9_vs_CHLA10.csv
     - GeneScore differential analysis
     - gene-level ATAC signal
     - answers q "is chromatin around gene more accessible in CHLA9 vs CHLA10"
@@ -1311,3 +1311,20 @@ scATAC DA
     - DA_peaks_CHLA9_vs_CHLA10_scATAC.csv
     - CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv
     - Generate BED files from chr locations in ^ files
+
+-----
+
+### Uploading .Rmd files to Github
+/projects/bgmp/shared/groups/2025/sarcoma/tnair/scAnalysis_Rmd<br>
+
+scRNA_9cl_integration_annotation.Rmd (Apptainer)<br>
+scRNA_9cl_GO_GSEA.Rmd (apptainer/locally)<br>
+CHLA9_vs_CHLA10_scRNA.Rmd<br>
+CHLA9_vs_CHLA10_scATAC.Rmd<br>
+
+### Uploaded .csvs to shared folder
+/projects/bgmp/shared/groups/2025/sarcoma/tnair/Seurat/CHLA9_vs_CHLA10<br>
+/projects/bgmp/shared/groups/2025/sarcoma/shared/CHLA9_vs_CHLA10<br>
+
+CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv<br>
+DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv<br> DA_peaks_CHLA9_vs_CHLA10_scATAC.csv<br>
