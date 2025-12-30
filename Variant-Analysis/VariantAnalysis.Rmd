@@ -18,7 +18,7 @@ library(tidyverse)
 # Generate the variants data frame
 
 ```{r}
-variants = fread(file = "~/bioinfo/EwsProject/Variant-Analysis/genecelllinevariant.tsv")
+variants = read_tsv(file = "~/bioinfo/EwsProject/Variant-Analysis/genecelllinevariant.tsv")
 ```
 
 # Exploratory Data Anaylsis
@@ -177,18 +177,6 @@ upset(data_list2,
       text.scale = c(3, 1.5, 1.75, 1, 2, 1.5))
 ```
 
-# Comparing CHLA9 and CHLA10
-```{r}
-upset(data_list2, 
-      sets = c("CHLA9","CHLA10"),
-      order.by = "freq",
-      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Variants in Genes per Cell Line",
-      number.angles = 0, point.size = 3, line.size = 1, 
-      sets.bar.color = "forestgreen",
-      main.bar.color = "forestgreen",
-      matrix.color = "forestgreen",
-      text.scale = c(1.5iinst, 1.5, 0.75, 1, 2, 1.5))
-```
 # Exploring other fusions: attempting to back up their legitimacy
 
 ```{r}
@@ -211,4 +199,139 @@ breakpoints %>%
   filter(Gene != "FLI1" & Gene != "EWSR1") %>% 
   filter(Cell_Line == "A673" | Cell_Line == "CHLA10" | Cell_Line == "TC32") %>% 
   filter(Gene == "HIVEP3" | Gene == "SUCLA2")
+```
+
+# Comparing CHLA9 and CHLA10
+
+## UpSet Plot
+
+```{r}
+upset(data_list2, 
+      sets = c("CHLA9","CHLA10"),
+      order.by = "freq",
+      mainbar.y.label = "# of Shared Variants in Genes", sets.x.label = "# of Variants in Genes per Cell Line",
+      number.angles = 0, point.size = 3, line.size = 1, 
+      sets.bar.color = "forestgreen",
+      main.bar.color = "forestgreen",
+      matrix.color = "forestgreen",
+      text.scale = c(1.5, 1.5, 0.75, 1, 2, 1.5))
+```
+
+```{r}
+
+insertions_2way = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Insertion" & (Cell_Line == "CHLA9" | Cell_Line == "CHLA10")) %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "green") +
+  labs(y = "", x = "", title = "Insertions") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+deletions_2way = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Deletion" & (Cell_Line == "CHLA9" | Cell_Line == "CHLA10")) %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "lightgreen") +
+  labs(y = "", x = "", title = "Duplications") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+duplications_2way = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Duplication" & (Cell_Line == "CHLA9" | Cell_Line == "CHLA10")) %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkgreen") +
+  labs(y = "", x = "", title = "Duplications") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+breakpoints_2way = variants %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Breakpoint" & (Cell_Line == "CHLA9" | Cell_Line == "CHLA10")) %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "forestgreen") +
+  labs(y = "", x = "", title = "Breakpoints") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+((insertions_2way + deletions_2way) / (duplications_2way + breakpoints_2way)) + 
+  plot_annotation(
+    title = "Number of Variants within Genes, CHLA9 v. CHLA10",
+    caption = "X Axis: Cell Line | Y Axis: Number of Variants"
+  )
+
+```
+
+
+```{r}
+unique_genes_CHLA = variants %>%
+  filter(Cell_Line == "CHLA9" | Cell_Line == "CHLA10") %>% 
+  distinct(Cell_Line, gene_and_variant, .keep_all = TRUE)
+
+insertions_2way_uniq = unique_genes_CHLA %>% 
+  na.omit(unique_genes_CHLA) %>%
+  filter(Variant_Type == "Insertion") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkorchid1") +
+  labs(y = "", x = "", title = "Insertions") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+deletions_2way_uniq = unique_genes_CHLA %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Deletion") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkorchid2") +
+  labs(y = "", x = "", title = "Deletion") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+duplications_2way_uniq = unique_genes_CHLA %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Duplication") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkorchid3") +
+  labs(y = "", x = "", title = "Duplication") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+breakpoints_2way_uniq = unique_genes_CHLA %>% 
+  na.omit(variants) %>%
+  filter(Variant_Type == "Breakpoint") %>% 
+  mutate(count = 1) %>% 
+  ggplot(aes(x = Cell_Line, y = count)) +
+  geom_bar(stat = "identity", color = "darkorchid4") +
+  labs(y = "", x = "", title = "Breakpoint") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+((insertions_2way_uniq + deletions_2way_uniq) / (duplications_2way_uniq + breakpoints_2way_uniq)) + 
+  plot_annotation(
+    title = "Number of Unique Variants within Genes, CHLA9 v. CHLA10",
+    caption = "X Axis: Cell Line | Y Axis: Number of Variants"
+  )
 ```
