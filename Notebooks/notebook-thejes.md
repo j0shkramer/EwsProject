@@ -1328,3 +1328,7 @@ CHLA9_vs_CHLA10_scATAC.Rmd<br>
 
 CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv<br>
 DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv<br> DA_peaks_CHLA9_vs_CHLA10_scATAC.csv<br>
+
+git add scAnalysis_Rmd/
+git commit -m "adding all .Rmd files (scRNA-scATAC)"
+git push origin main
