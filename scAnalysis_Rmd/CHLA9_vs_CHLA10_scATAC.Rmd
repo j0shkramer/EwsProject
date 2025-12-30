@@ -1,0 +1,584 @@
+---
+title: "CHLA9_vs_CHLA10_scATAC"
+author: "Thejes Nair"
+date: "2025-12-27"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(Signac)
+library(dplyr)
+library(tibble)
+library(GenomicRanges)
+library(ggplot2)
+library(biovizBase)
+library(EnsDb.Hsapiens.v86)
+```
+
+Differential chromatin accessibility between CHLA9 and CHLA10
+
+```{r}
+# clear memory, local RStudio reaches mem max bc of prev loaded .rds obj
+rm(seu)
+gc()
+# read in integrated rds obj
+seu_atac = readRDS("/Users/thejesnair/Desktop/KCGIP/EwS/seurat_integration_finalAnnotations.rds")
+
+DefaultAssay(seu_atac) = "ATAC"
+```
+
+```{r}
+# sanity check
+Assays(seu_atac)
+DefaultAssay(seu_atac)
+
+# cell lines
+table(seu_atac$cell_line)
+
+# subset cell lines
+seu_chla = subset(seu_atac, subset=cell_line %in% c("CHLA9", "CHLA10"))
+table(seu_chla$cell_line)
+
+# remove seu_atac from mem to free up space
+rm(seu_atac); gc()
+```
+
+logistic regression differential accessibility (DA), control for fragments per cell (covariate: variable used in statistical modeling to account for factors that may influence chromatin accessibility, but not primary experimental variable being studied)
+
+nFeature_ATAC: number of peaks detected per cell, proxy for ATAC sequencing depth, covariate
+
+nCount_ATAC: total fragment counts per cell, sequencing-depth related as well
+
+```{r}
+colnames(seu_chla@meta.data) # look for ATAC covariate
+# listed as nFeature_ATAC
+# listed as nCount_ATAC
+
+# summary of nFeature_ATAC
+summary(seu_chla@nFeature_ATAC)
+```
+
+```{r}
+VlnPlot(seu_chla, features = c("nCount_ATAC", "nFeature_ATAC", "FRIP", "TSSEnrichment"),
+        group.by = "cell_line", pt.size = 0, ncol = 2)
+```
+*DIFFERENTIAL ACCESSIBILITY*
+```{r}
+lr_da_peaks = FindMarkers(
+  object=seu_chla,
+  ident.1 = "CHLA9",
+  ident.2 = "CHLA10",
+  test.use = "LR",
+  latent.vars = "nCount_ATAC",
+  min.pct=0.1
+)
+```
+
+```{r}
+lr_da_peaks
+
+# reformat
+lr_da_peaks2 = lr_da_peaks %>% 
+  rownames_to_column("peak") %>% 
+  arrange(p_val_adj) %>% 
+  select(peak, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+
+lr_da_peaks2
+
+# save file
+write.csv(lr_da_peaks2, "DA_peaks_CHLA9_vs_CHLA10_scATAC.csv", row.names=FALSE)
+```
+
+```{r}
+# how many peaks significant
+sum(lr_da_peaks2$p_val_adj <= 0.05)
+head(lr_da_peaks2, 10)
+
+```
+
+```{r}
+# volcano plot
+lr_da_peaks2 %>%
+  mutate(direction = case_when(
+    p_val_adj <= 0.05 & avg_log2FC >= 0.25 ~ "More open in CHLA9",
+    p_val_adj <= 0.05 & avg_log2FC <= -0.25 ~ "More open in CHLA10",
+    TRUE ~ "Not sig"
+  )) %>%
+  ggplot(aes(x = avg_log2FC, y = -log10(p_val_adj), color = direction)) +
+  geom_point(alpha = 0.6, size = 0.8) +
+  theme_classic(base_size=15) +
+  xlab("log2FC accessibility (CHLA9 − CHLA10)") +
+  ylab("-log10(adj p-value)") +
+  ggtitle("Differential accessibility (ATAC): CHLA9 vs CHLA10")
+
+ggsave("DA_ATAC_CHLA9_vs_CHLA10.svg", width=10, height=8, dpi=900)
+```
+Volcano plot:
+x-axis: avg_log2FC (accessibility)
+  positive values (right), peaks mean more accessibility in CHLA9 (pre-treatment)
+      condition one is "up" relative to condition two "down"
+  negative values (left), peaks mean more accessibility in CHLA10 (post-treatment)
+      condition one is "down" relative to condition two "up"
+      
+y-axis:
+  higher, more statistically significant
+  
+
+areas to pay attention to:
+  top-left (more open in CHLA10) <- good area to focus on??? post-treatment regulatory changes
+  top-right quadrants (more open in CHLA9)
+    
+
+```{r}
+
+# verifying that genescorematrix is part of atac and not rna b/c i keep reading conflicting things online
+class(seu_chla[["ATAC"]])
+seu_chla[["GeneScoreMatrix"]]@counts[1:5, 1:5]
+summary(seu_chla[["GeneScoreMatrix"]]@counts@x)
+summary(seu_chla[["GeneExpressionMatrix"]]@counts@x)
+```
+
+```{r}
+# verifying
+FeatureScatter(
+  seu_chla,
+  feature1 = "nCount_ATAC",
+  feature2 = "nCount_GeneScoreMatrix"
+) # yes it is tracking ATAC data
+
+FeatureScatter(
+  seu_chla,
+  feature1 = "nCount_GeneExpressionMatrix",
+  feature2 = "nCount_GeneScoreMatrix"
+)
+```
+
+```{r}
+# select sig/biological meaningful DA peaks
+sig_peaks = lr_da_peaks2 %>% 
+  filter(p_val_adj) <=0.05, abs(avg_log2FC >=0.5))
+```
+
+ATAC is an Assay not a ChromatinAssay, so it was not created using CreateChromatinAssay()
+What we have is peak x cell matrix store as a plain Seurat Assay
+
+```{r}
+class(seu_chla[["ATAC"]])
+DefaultAssay(seu_chla) = "ATAC"
+head(rownames(seu_chla))
+#Annotation(seu_chla[["ATAC]]) # won't work
+```
+
+So then what about MotifMatrix?
+Most likely a motif activity/deviation matrix (TF x cell)
+motif-level (TFs), already aggregated, not peak-based, stored as plain assay
+rownames look like peaks chr1-...
+```{r}
+class(seu_chla[["MotifMatrix"]])
+DefaultAssay(seu_chla) = "MotifMatrix"
+head(rownames(seu_chla)) # yes, TFA names
+```
+follow this vignette
+https://stuartlab.org/signac/articles/pbmc_vignette.html
+
+
+```{r}
+# filter significant peaks
+sig_da = lr_da_peaks2 %>% 
+  filter(p_val_adj <=0.05, abs(avg_log2FC) >= 0.25) # kept at 0.25 for sensitivity
+
+nrow(sig_da)
+
+# convert peak strings -> GRanges
+peak_gr = StringToGRanges(sig_da$peak, sep = c("-", "-"))
+peak_gr
+```
+quick pivot, want to check gene naming conventions 
+```{r}
+head(rownames(seu_chla[["GeneExpressionMatrix"]], 20))
+sum(grepl("^ENSG", rownames(seu_chla[["GeneExpressionMatrix"]])))
+
+peaks <- rownames(seu_chla[["ATAC"]])
+max(as.numeric(sub(".*-", "", peaks))) # atac peak coordinates to determine if hg19 or h38
+# going with hg38 because closest to that so going to use EnsDb
+# wanted to verify bc saw either EnsDb or TxDb as options
+tail(sort(peaks[grepl("^chr1-", peaks)]), 5)
+```
+hg19 chr1 ≈ 249,250,621
+hg38 chr1 ≈ 248,956,422
+
+
+https://rdrr.io/bioc/ensembldb/f/vignettes/coordinate-mapping.Rmd
+
+
+```{r}
+DefaultAssay(seu_chla) <- "MotifMatrix"
+dim(seu_chla) # features x cells
+```
+
+back to peak-> gene mapping
+```{r}
+# change default assay back to ATAC
+DefaultAssay(seu_chla) = "ATAC"
+
+# get genes
+genes = GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
+
+# peaks are UCSC style (chr1), force genes to UCSC
+# ensembl/ncbi style is 1-X,Y,MT
+seqlevelsStyle(genes) = "UCSC"
+genome(genes) = "hg38"
+```
+
+```{r}
+# check to make sure it worked
+head(seqlevels(genes))
+head(seqlevels(peak_gr))
+length(intersect(seqlevels(peak_gr), seqlevels(genes)))
+```
+
+peaks = genomic intervals
+genes = genomic intervals
+
+need to build spatial relationship b/w peaks and genes
+StringToGRanges: parses strings (ex: chr1-59814420-59814920), splits chr, start, end
+turns into GRanges object (which is the standard genomic interval container in Bioconductor)
+
+so then each peak is a proper genomic interval, depicts the exact region on the chr
+```{r}
+# make sure peak_gr built from DA peak list and named
+peak_gr = StringToGRanges(sig_da$peak, sep=c("-", "-")) 
+# converts peak coordinate strings to genomic intervals so can be spatially compared to genes
+
+names(peak_gr) = sig_da$peak # make sure rows are properly named to preserve peak identity for index-based operations
+
+```
+
+keepSeqlevels: basically, drop chr that arent in the shared list
+coarse: drop chromosomes and drop ranges that are on them, so only keeps chrs in common,
+discards peaks/genes on non-common chr
+
+default is error: would throw an error and stop if anything is dropped
+```{r}
+# reduce to shared chromosomes
+common = intersect(seqlevels(peak_gr), seqlevels(genes)) # only chr that appear in BOTH peaks and genes are kept
+peak_gr = keepSeqlevels(peak_gr, common, pruning.mode = "coarse") # any genomic range that lives on a chr NOT in common is dropped entirely
+# chr not shared? dropped
+# oeak/gene on that chr, dropped
+# chr shared? all ranges are kept (for now)
+
+genes = keepSeqlevels(genes, common, pruning.mode="coarse")
+```
+
+```{r}
+# MAP PEAK -> NEAREST GENE
+
+hits = distanceToNearest(peak_gr, genes)
+
+peak_to_gene = data.frame(
+  peak=names(peak_gr)[queryHits(hits)],
+  gene=genes$gene_name[subjectHits(hits)],
+  gene_biotype = genes$gene_biotype[subjectHits(hits)],
+  dist_to_gene=mcols(hits)$distance
+)
+
+head(peak_to_gene)
+```
+
+gene biotype: classification (so protein-coding, long noncoding, pseudogene)
+```{r}
+# merge gene annotations back onto DA table
+# one table with stats (padj val, log2fc) and biology (gene name, biotype, distance)
+
+sig_da_anno = sig_da %>% 
+  left_join(peak_to_gene, by="peak") %>% 
+  dplyr::select(peak, gene, gene_biotype, dist_to_gene,
+                p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+
+head(sig_da_anno)
+
+# write to csv
+write.csv(sig_da_anno, "DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv", row.names=FALSE)
+```
+
+```{r}
+# sanity check to make sure mapping worked
+sum(is.na(sig_da_anno$gene))
+summary(sig_da_anno$dist_to_gene)
+```
+
+```{r}
+# add direction, log2fc more interpretable
+sig_da_anno = sig_da_anno %>% 
+  mutate(direction = ifelse(avg_log2FC > 0, "More open in CHLA9","More open in CHLA10"))
+
+table(sig_da_anno$direction)
+```
+
+RECALL from earlier volcano plot:
+  positive values (right), peaks mean more accessibility in CHLA9 (pre-treatment)
+      condition one is "up" relative to condition two "down"
+  negative values (left), peaks mean more accessibility in CHLA10 (post-treatment)
+      condition one is "down" relative to condition two "up"
+      
+      
+```{r}
+# overlap with RNA DEGs
+# this is from the CHLA9_CHLA10_scRNA.rmd
+de_stress2 = read.csv("/Users/thejesnair/Desktop/KCGIP/EwS/DEG_CHLA9_vs_CHLA10_StressLike_all.csv")
+de_mes2 = read.csv("/Users/thejesnair/Desktop/KCGIP/EwS/DEG_CHLA9_vs_CHLA10_MesenchymalLike_all.csv")
+
+deg_genes = unique(c(de_stress2$gene, de_mes2$gene))
+
+sig_da_anno = sig_da_anno %>% 
+  mutate(is_RNA_DEG = gene %in% deg_genes) # is the nearest gene to this DA peak in my RNA DEG list? but RNA DEG is only coming from 2 programs that had the biggest proportion of cells in CHLA9,10 cell lines
+
+table(sig_da_anno$is_RNA_DEG)
+```
+
+so the 563 false can be from other programs, since I limited it to 2 programs with biggest proportions
+
+600 true: DA Peaks near genes that are in our RNA DEGs data
+563 false: DA peaks near genes that are NOT IN RNA DEGs data
+  however, "false" is not bad or meaningless
+    simply can be that DEGs are in other transcriptional programs (neural, proliferative)
+    genes have post-transcriptional regulation
+    regulatory priming w/o RNA output
+    distal enhancer effects (look at TF enrichment for this?)
+```{r}
+table(seu_chla$final_annotation[Cells(seu_chla) %in% Cells(subset(seu_chla, features = sig_da_anno$peak))])
+table(sig_da_anno$is_RNA_DEG, sig_da_anno$gene_biotype)
+```
+Peaks that show both accessibility change and RNA expression change tend to regulate protein-coding genes
+
+dataset dominated by stress + mesenchymal states
+DA peaks occuring in those cells proportionally
+
+protein coding dominates true overlaps, so peaks overlapping RNA DEGs are mostly near protein-coding genes not lncRNA artifacts
+
+biologically interpretable regulation
+
+```{r}
+# ATAC->RNA bridge (still need to look at motifs though)
+sig_da_anno %>%
+  mutate(overlap = ifelse(is_RNA_DEG, "Peak near RNA DEG", "Peak not near RNA DEG")) %>%
+  ggplot(aes(x = direction, fill = overlap)) +
+  geom_bar(position = "fill") +
+  ylab("Fraction of DA peaks") +
+  xlab("") +
+  theme_classic() +
+  ggtitle("DA peaks near RNA DEGs (nearest-gene mapping)")
+```
+Among peaks that are differentially accessible, what fraction are near genes that are RNA DEGs (stress-like mesenchymal-like)?
+
+Started with sig DA peaks (atac)
+split by: more open in CHLA10, CHLA9
+for each group asked is the nearest gene to these open regions in the RNA analysis results? (stress + mes programs)
+
+so bars are showing:
+of ALL DA peaks biased towards this program, what fraction are near genes that ALSO change at the RNA level?
+
+substnatial fraction of regulatory changes are reflected at RNA level, BUT not all-- this is similar pre and post treatment
+
+supports idea that regulatory remodeling is widespread, only a part of it translates to detectable transcriptional changes in the programs tested
+
+
+stacked bar plot confirms ATAC + RNA signals are not random
+
+
+*GeneScoreMatrix DA*
+
+Goal: identify genes whose ATAC-derived gene activity differs b/w CHLA9 and CHLA10
+
+
+```{r}
+# sanity check
+DefaultAssay(seu_chla) # currently ATAC
+
+# switch assay to GeneScoreMatrix
+DefaultAssay(seu_chla) = "GeneScoreMatrix"
+
+# more sanity checks, want to make sure data inside is what we want
+seu_chla[["GeneScoreMatrix"]]
+Layers(seu_chla[["GeneScoreMatrix"]]) # should see counts and data
+genes_test = head(rownames(seu_chla[["GeneScoreMatrix"]]), 4)
+VlnPlot(seu_chla, features = genes_test, group.by = "cell_line", pt.size = 0)
+```
+
+
+```{r}
+# differential gene activity
+
+# running findmarkers again because DIFFERENT assay, so it feels repetitive but it's not
+# genescorematrix represents continuous, gene level ATAC signal
+gs_deg = FindMarkers(
+  seu_chla,
+  ident.1="CHLA9",
+  ident.2="CHLA10",
+  test.use="wilcox", # distributional comparison, is gene more active? 
+  # aggregated accessibility around genes, not sparse peak presence, wilcoxon is appropriate here
+  min.pct = 0.1,
+  logfc.threshold = 0.0 # will filter down later
+)
+```
+
+```{r}
+# format table
+gs_deg2 = gs_deg %>% 
+  tibble::rownames_to_column("gene") %>% 
+  dplyr::arrange(p_val_adj) %>% 
+  dplyr::select(gene, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+
+head(gs_deg2)
+
+write.csv(gs_deg2, "GeneScore_DEG_CHLA9_vs_CHLA10.csv", row.names=FALSE)
+
+sum(gs_deg2$p_val_adj <=0.05)
+head(gs_deg2, 10)
+```
+
+
+*Gene-centric convergence*
+
+These are genes that are found in the RNA DEG analysis between CHLA9 and CHLA10
+AND
+Identified using genescore-differential between CHLA9 and CHLA10 (so gene level ATAC-derived activity)
+
+So it's combining both transcriptional + regulatory signal
+
+pct is just percentage of cells that show gene is accessible in
+
+To summarize again:
+1. RNA data (GeneExpressionMatrix)
+- is this gene more expressed in CHLA9 or CHLA10?
+
+2. ATAC peaks (ATAC)
+- Is this specific DNA region more open in CHLA9 or CHLA10?
+
+3. GeneScoreMatrix (ATAC -> gene)
+- Is the chromatin around this gene more permissive in CHLA9 or CHLA10?
+(regulatory potential, not expression)
+- aggregates ATAC signal across a window around a gene
+  - promoter, gene body
+- collapses many peaks into one gene level value
+- so ATAC-derived BUT gene-centric
+
+
+
+The whole reason we're looking at genescorematrix is to look at the area AROUND the open region of chromatin and determine how permissive it is (is the area open and accessible for the cell to turn that gene on), then we can compare to the actual RNA DEG results and see if there's overlap and agreement 
+```{r}
+# gene-centric converage (RNA DEGs + GeneScore DEGs)
+
+# USE this from earlier
+#deg_genes = unique(c(de_stress2$gene, de_mes2$gene))
+
+# filtered significant GeneScore genes
+gs_sig = gs_deg2 %>% 
+  dplyr::filter(p_val_adj <= 0.05)
+
+# overlap set between RNA DEG expression and significant GeneScore genes
+convergent_genes = gs_sig %>% 
+  dplyr::filter(gene %in% deg_genes)
+
+nrow(convergent_genes)
+head(convergent_genes, 20)
+
+```
+*Triple convergent table? (RNA + GeneScore + DA peak evidence)*
+
+1. RNA DEG
+ genes' expression changes
+2. GeneScoreMatrix DEG
+ area around chromatin is permissive (relative to other cell line, regulatory potential/accessibility)
+ (>0, more accessible in CHLA9, <0, more permissive in CHLA10)
+3. nearby DA peak
+ local regulatory DNA that is open/closed
+ 
+answers question which genes show coordinated regulatory and transcriptional changes?
+```{r}
+colnames(de_stress2)
+colnames(de_mes2)
+```
+
+Put direction (higher in which cell line?)
+```{r}
+convergent_genes2 = convergent_genes %>% 
+  mutate(
+    direction = ifelse(avg_log2FC>0, "Higher in CHLA9", "Higher in CHLA10"))
+
+head(convergent_genes2)
+convergent_genes2
+write.csv(convergent_genes2, "ConvergentGENES_RNA_GeneScore_CHLA9_vs_CHLA10.csv", row.names=FALSE)
+```
+
+```{r}
+# ALL THREE CONVERGING
+triple_convergent = convergent_genes2 %>% 
+  dplyr::filter(gene %in% sig_da_anno$gene) %>% 
+  dplyr::rename(direction_genescore = direction)
+triple_convergent
+#nrow(convergent_genes); nrow(convergent_genes2)
+
+write.csv(triple_convergent, "CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv")
+```
+
+Reduced from convergent_genes2 (4088) to triple_convergent (457), so these genes have
+1. differential gene expression
+  gene's expression changes b/w CHLA9 and CHLA10
+2. permissive gene score (accessibility around chromatin regions)
+  chromatin environment *AROUND* the gene is *MORE* accessible in one condition vs the other
+3. open chromatin peaks in general
+  specific chromatin region near gene is differentially accessible
+ 
+*DONE WITH ATAC, GENESCOREMATRIX*
+
+
+*Initial look into MotifMatrix*
+
+May not have the full motif/peak backing needed for Signac's built in enrichment functions since ATAC assay is a normal Seurat assay and not ChromatinAssay
+
+```{r}
+# switch to MotifMatrix
+
+# what is motif assay keyed by?
+DefaultAssay(seu_chla) = "MotifMatrix"
+head(rownames(seu_chla[["MotifMatrix"]]),5) # outputs TF_ names, transcription factors
+
+# Are there any peak-level motif matrices stored?
+seu_chla[["ATAC"]]
+length(rownames(seu_chla[["ATAC"]]))
+
+names(seu_chla[["ATAC"]]@misc)
+```
+
+```{r}
+nrow(seu_chla[["ATAC"]]) # total num peaks 
+nrow(lr_da_peaks) # identified after running FindMarkers()
+nrow(lr_da_peaks2)
+
+sum(lr_da_peaks$p_val_adj <= 0.05, na.rm = TRUE) # 1300 significant peaks
+sum(lr_da_peaks$p_val_adj <= 0.05 & abs(lr_da_peaks$avg_log2FC) >= 0.25, na.rm = TRUE) # 1163 after filtering
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+

@@ -1,0 +1,1495 @@
+---
+title: "scRNA 9cl program annotation"
+author: "Thejes Nair"
+date: "2025-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(Seurat)
+library(dplyr)
+library(patchwork)
+library(tidyverse)
+library(readr)
+library(pheatmap)
+library(ggplot2)
+library(ggrepel)
+library(future)
+library(msigdbr)
+library(scCustomize)
+```
+
+*Clean up genes by cell line data, rearrange*
+
+```{r}
+# load tidyverse to go through data
+raw.lines = read_lines("/projects/bgmp/shared/groups/2025/sarcoma/shared/filtered_struc_variants/celllinesgenes.tsv")
+head(raw.lines)
+
+# initialize vectors to store results
+cell.lines.vec = c()
+genes.vec = c()
+
+#EwS 9 cell lines
+ews.cls = c("A673", "A4573", "CHLA9", "CHLA10", "PDX305", 
+            "RDES", "SKNMC", "TC32", "TC71")
+# variables
+current.cellline = NULL #placeholder for current cell line
+
+# loop through each line
+for (line in raw.lines) {
+ clean.line = str_trim(line) #remove trailing space
+ if (clean.line %in% ews.cls) {
+   current.cellline = clean.line #Cell line
+ } else {
+   #Gene name
+   cell.lines.vec = c(cell.lines.vec, current.cellline)
+   genes.vec = c(genes.vec, clean.line)
+ }
+}
+```
+
+```{r}
+# combine cls and genes into df
+df = tibble(cell_line = cell.lines.vec, gene = genes.vec)
+
+# write to tsv
+write_tsv(df, "genes_by_cellline_clean.tsv")
+
+print(head(df))
+print(tail(df))
+```
+
+```{r}
+# turn df into vectored list for each cell
+
+genes_celline = df %>% 
+  distinct(cell_line, gene) %>% 
+  group_by(cell_line) %>% 
+  reframe(genes=list(unique(gene))) %>% deframe() #return tibble to list
+```
+
+```{r}
+# check df
+class(genes_celline)
+names(genes_celline)
+genes_celline$A673
+```
+
+*SEURAT OBJECT*
+
+```{r}
+# load Seurat obj, cross fingers and toes
+rm(list = ls()); gc() #clear memory bc otherwise get an error if i try to reload data
+seurat_ob = readRDS("/projects/bgmp/shared/groups/2025/sarcoma/shared/Multiome/9cl_seurat.rds")
+exists("seurat_ob")
+```
+Let's do some EDA and take a look more into Seurat object/metadata
+```{r}
+seurat_ob
+```
+Default assay is MotifMatrix --> need to change to GeneExpressionMatrix (scRNA-seq)
+Outlined more in lab notebooks
+
+```{r}
+DefaultAssay(seurat_ob) = "GeneExpressionMatrix" # set default/active assay to scRNA-seq data
+slotNames(seurat_ob[["GeneExpressionMatrix"]]) # what's stored inside the assay
+VariableFeatures(seurat_ob)[1:5] 
+colnames(seurat_ob@meta.data) # check for clustering
+```
+counts: raw counts
+data: log normalized values, from NormalizeData()
+scale.data: scaled expression (used for PCA), from ScaleData()
+assay.orig: made when seurat objs are saved/merged
+var.features: highly variable genes identified from FindVariableFeatures() used for downstream analysis like PCA
+
+**VariableFeatures**: most variable genes across cells in dataset, expression fluctuates after normalization
+But this is all before we've integrated
+
+Code that did these steps from github script:
+https://github.com/furlan-lab/EwS_multiome/blob/main/code/make_object_9_ewing_cell_lines.Rmd
+
+seu<-NormalizeData(t) %>% FindVariableFeatures() %>% ScaleData() %>% RunPCA()
+
+```{r}
+# integrated and clustered?
+"integrated" %in% Assays(seurat_ob)
+names(seurat_ob@commands) # look at command history
+# no "FindIntegrationAnachors" or "IntegrateLayers" "IntegrateData" 
+head(seurat_ob@meta.data) # META DATA 
+Reductions(seurat_ob)# what dimensionality reduction techniques were done (PCA, UMAP)
+
+seurat_ob[["pca"]]@assay.used # verifying that PCA and UMAP dimensionality reduction techniques done on UNINTEGRATED data
+seurat_ob[["mo_UMAP"]]@assay.used
+```
+mo_UMAP and pca reductions
+pca, mo_UMAP: pc based on RNA only (GeneExpressionMatrix)
+thought mo_UMAP was with combined sc data, it isn't
+also thought this meant data was already integrated, but also no
+
+*INTEGRATE*
+
+```{r}
+unique(seurat_ob@meta.data$cell_line) # making sure cell lines are in this col
+
+# SPLIT object by cell lines
+objs = SplitObject(seurat_ob, split.by = "cell_line")
+
+# data is already normalized, there are already variable features per object (this will change though after integration)
+# picking integration features
+features = SelectIntegrationFeatures(object.list = objs, nfeatures = 2000 ) #nfeatures = 2000 from vignettes
+
+# check that obj split successfully 
+class(objs) # list
+length(objs) # 9 cell lines
+```
+
+```{r}
+# find anchors using CCA
+anchors = FindIntegrationAnchors(object.list = objs,
+                                 normalization.method = "LogNormalize",
+                                 anchor.features = features,
+                                 reduction = "cca")
+```
+
+```{r}
+class(anchors)
+anchors
+```
+
+```{r}
+# integrate, make sure to set normalization method to what was used previously and use features created
+seurat_integration = IntegrateData(anchorset = anchors,
+                                   normalization.method = "LogNormalize",
+                                   features.to.integrate = features,
+                                   new.assay.name = "integratedCCA")
+```
+
+```{r}
+# confirm integration
+class(seurat_integration)
+
+# does assay exist?
+Assays(seurat_integration)
+Key(seurat_integration[["integratedCCA"]]) # will end with _
+
+seurat_integration
+```
+*PCA, UMAP, CLUSTERING, VISUALIZATIONS*
+
+```{r}
+DefaultAssay(seurat_integration) = "integratedCCA"
+
+# standard Seurat workflow for clustering and visualization
+seurat_integration = ScaleData(seurat_integration, verbose = FALSE)
+seurat_integration = RunPCA(seurat_integration, npcs=30, verbose = FALSE)
+
+# before creating UMAP visuals, check the PC dimensions, set it to 30 earlier but will probably be much less
+ElbowPlot(seurat_integration, ndims=30) # cut off around 18
+
+set.seed(31) # consistent UMAP orientation in re-run
+seurat_integration = RunUMAP(seurat_integration, dims=1:18, verbose= FALSE) #use PCA dimensions for UMAP
+seurat_integration = FindNeighbors(seurat_integration, dims=1:18)
+seurat_integration = FindClusters(seurat_integration, resolution = 0.5)
+```
+Quick checks
+
+```{r}
+# sanity check, built on integrated assay?
+seurat_integration[["pca"]]@assay.used
+"integratedCCA" %in% Assays(seurat_integration)
+
+# clusters present?
+colnames(seurat_integration@meta.data) #seurat_clusters !!!!, 'Clusters' is from original unintegrated data
+head(Idents(seurat_integration))
+levels(Idents(seurat_integration)) # 8 clusters
+
+```
+
+Went from 25 clusters (unintegrated) to 9 after integration (clusters 0-8) so redundant, dataset-specific clusters were collapsed. Integration alignedshared cellular states/transcriptional programs amongst cell lines, whereas unintegrated was just mapping everything--batch effects, noise, dataset specific differences, which was increasing the number of clusters. Integration leaves biological heterogeneity behind, giving a better reflection of the transcriptional diversity in the 9 cell lines.
+
+*SAVE INTEGRATED RDS OBJECT*
+
+```{r}
+saveRDS(seurat_integration, file = "integrated_seurat.rds")
+```
+
+```{r}
+# load file for later us
+seurat_integration = readRDS("/projects/bgmp/shared/groups/2025/sarcoma/tnair/Seurat/integrated_seurat.rds")
+```
+
+*checking everything is good for Vini*
+
+```{r}
+# is an object
+class(seurat_integration)
+
+seurat_integration[["GeneExpressionMatrix"]]
+
+# metadata, cell lines + clusters (seurat_clusters is integrated clusters)
+colnames(seurat_integration@meta.data)
+head(seurat_integration@meta.data)
+
+# what assays
+Assays(seurat_integration) # integratedCCA from me
+
+# which reductions
+Reductions(seurat_integration)
+
+# seurat clusters contain info
+table(seurat_integration$seurat_clusters)  # yes they do
+
+seurat_integration[["GeneExpressionMatrix"]]@data[1:5, 1:5]
+seurat_integration[["GeneExpressionMatrix"]]@counts[1:5, 1:5]
+seurat_integration[["GeneExpressionMatrix"]]@data["POLQ", ] %>% head()
+VlnPlot(seurat_integration, features = "POLQ", group.by = "cell_line")
+dim(seurat_integration[["GeneExpressionMatrix"]]@data) # 36,438 genes × 19,737 cells
+```
+```{r}
+DimPlot(seurat_integration,
+        group.by = orig.ident)
+
+colnames(seurat_integration@meta.data)
+seurat_ob@Ass
+```
+
+
+
+```{r}
+head(seurat_integration)
+seurat_integration
+
+D
+```
+
+
+
+*UMAP VISUALIZATION*
+
+```{r}
+# UMAP colored by clusters
+p1 = DimPlot(seurat_integration, reduction = "umap", group.by="seurat_clusters", label=TRUE, repel=TRUE) + ggtitle("EwS Clusters")
+p2 = DimPlot(seurat_integration, reduction = "umap", group.by="cell_line", label=TRUE, repel=TRUE) + ggtitle("EwS Cell lines")
+
+combined_UMAPS = p1 + p2
+
+combined_UMAPS
+
+ggsave("combined_UMAPS.jpg", plot=combined_UMAPS, device = "jpeg", width = 13, height = 7, dpi = 300, bg = "white")
+```
+
+Several clusters (3,6, and 7) are predominantly composed of one cell line, SKNMC (retroorbital metastasis), whereas other clusters contained cells from multiple lines. Dominant clusters likely represent cell line–specific transcriptional programs that persist even after integration, while the mixed clusters correspond to shared EwS cellular states.
+
+
+Some cell lines are clustering together (indicated by line connecting labels) so want to see if I can quantify that
+
+```{r}
+# clusters (columns) by cell lines (rows)
+tab = table(seurat_integration$cell_line, Idents(seurat_integration))
+tab
+
+# convert to proportions within each cluster
+prop_tab = prop.table(tab, margin = 2)
+round(prop_tab, 2)
+
+# proportion of cell line's cells in that specific cluster
+library(pheatmap)
+line_vs_cluster = pheatmap(prop_tab, cluster_rows = FALSE, cluster_cols = FALSE,
+         color = colorRampPalette(c("white", "darkblue"))(50),
+         #main= "Proportion of Cell Lines in Clusters",
+         fontsize_row = 12,
+         fontsize_col = 12,
+         fontsize = 14)
+
+line_vs_cluster
+
+ggsave("cell_line_vs_cluster.png", plot=line_vs_cluster, width = 13, height = 7, dpi = 300)
+ggsave("cell_line_vs_cluster2.jpg", plot=line_vs_cluster, device = "jpeg", width = 13, height = 7, dpi = 300, bg = "white")
+
+```
+
+*FIND MARKERS (TOP UPREGULATED/DOWNREGULATED GENES)*
+
+We want the integrated clusters as the classifying variable for top marker identification
+Take cells grouped by integrated clusters (shared biological states) and compare gene expression values to see what's differentially expressed -> finding genes that DISTINGUISH integrated clusters -> later on annotate clusters
+
+
+```{r}
+seurat_integration # default assay is integratedCCA, need to switch to geneexpressionmatrix
+
+# utilizing seurat integration obj that contains integratedCCA assay, but switching to RNA data for marker identification
+# maintain cluster ids and umap coordinates
+
+DefaultAssay(seurat_integration) = "GeneExpressionMatrix"
+#seurat_integration # switched default
+
+# making sure classifying variable is set to integrated seurat_clusters, not Clusters from original obj
+#head(Idents(seurat_integration)) # 0-8 clusters
+#all(Idents(seurat_integration) == seurat_integration$seurat_clusters) # TRUE
+#all(Idents(seurat_integration) == seurat_integration$Clusters) # FALSE
+```
+
+*top markers*
+
+```{r}
+plan("multicore", workers = 12) # set up for parallelization
+markers = FindAllMarkers(seurat_integration,
+                         assay="GeneExpressionMatrix",
+                         logfc.threshold = 0.25, # default in older version (current is 0.1)
+                         min.pct = 0.1, # default in older version/HBC training (current is 0.01) gene expressed in >10% of cells
+                         only.pos = FALSE) # both up/down regulated
+
+plan("sequential") # return to default
+
+# can later subset markers to find pct w/ greater values pct.1, pct.2
+#strict_markers = markers %>% filter(pct.1 >= 0.25, (pct.1 - pct.2) >= 0.1)
+
+```
+
+Note: find all markers takes a while, took ~1hr
+
+**cluster:** cluster where gene is enriched
+**avg_log2FC:** log2 FC of avg expression b/w cluster and all others (higher=more strongly upregulated, lower=more strongly downregulated)
+**pct.1:** fraction of cells in this cluster that express gene
+  so 0.75, 75% of cells in this cluster express this gene
+**pct.2:** fraction of cells in OTHER clusters that express this gene
+  so 0.10, 10% cells outside o cluster express
+**p_val:** raw p-val (wilcoxon)
+**p_val_adj:** adj p val correcting for multiple comparisons
+  control for false positives
+  
+Upregulated: fusion-driven activation signatures(potential targets of EWS:FLI1?)
+
+Downregulated: repressed developmental/differentation genes (targets repressed by EWS:FLI1?)
+  mesenchymal programs silenced?
+
+EWSLLFLI1 is unique bc it acts as activator and supressor 
+Variant analysis later on will determine where there's overexpression (amplification), loss of expression (deleiton/truncation)
+Top/down markers will be useful for variant integration and pathway analysis later on as well (pathway/GO enrichment)
+
+```{r}
+# look at data
+head(markers)
+
+# rearrange
+markers = markers %>% 
+  select(gene, cluster, avg_log2FC, p_val_adj, pct.1, pct.2, p_val)
+
+head(markers)
+colnames(markers)
+#write.csv(head(markers,5), "test.csv", row.names = FALSE)
+
+# sig vs nonsig?
+markers %>%
+  summarize(
+    total_genes = n(),
+    significant = sum(p_val_adj <= 0.05),
+    nonsignificant = sum(p_val_adj > 0.05)
+  )
+
+# filter sig genes, subset top up/down regulated
+
+sig_markers = markers %>% filter(p_val_adj <= 0.05)
+
+up_reg_markers = sig_markers %>% 
+  filter(avg_log2FC > 0) %>% # log2FC GREATER than 0
+  group_by(cluster) %>% 
+  slice_max(order_by= avg_log2FC, n = 100) # selects top 100 genes PER cluster
+
+down_reg_markers = sig_markers %>% 
+  filter(avg_log2FC < 0) %>% # log2FC LESS than 0
+  group_by(cluster) %>% 
+  slice_min(order_by = avg_log2FC, n = 100)
+```
+```{r}
+# peek into top 100 genes up/down
+head(up_reg_markers)
+head(down_reg_markers)
+
+# 100 per cluster? so 900 total
+table(up_reg_markers$cluster)
+table(down_reg_markers$cluster)
+```
+
+*DELIVERABLES FOR ENRICHMENT/PATHWAY ANALYSES*
+
+```{r}
+# save integrated marker object
+head(markers)
+saveRDS(markers, "cluster_markers.rds")
+
+# save csv files for Josh
+write.csv(up_reg_markers, "top100_upregulated_markers.csv", row.names = FALSE)
+write.csv(down_reg_markers, "top100_downregulated_markers.csv", row.names = FALSE)
+```
+
+```{r}
+# load integrated markers
+markers = readRDS("/projects/bgmp/shared/groups/2025/sarcoma/tnair/Seurat/cluster_markers.rds")
+class(markers)
+head(markers)
+```
+
+
+```{r}
+seurat_ob # original obj
+```
+
+```{r}
+seurat_integration # integrated obj
+Layers(seurat_integration[["GeneExpressionMatrix"]])   # expect counts, data (and scale.data if scaled)
+Layers(seurat_integration[["integratedCCA"]])          # data (and scale.data if scaled)
+dim(seurat_integration)
+head(seurat_integration)
+```
+Determine which cell line is enriched in which cluster
+```{r}
+# quick breakdown
+table(seurat_integration$seurat_clusters, seurat_integration$cell_line)
+```
+Which clusters correspond to which cell lines
+```{r}
+# more comprehensive
+seurat_integration@meta.data %>%
+  group_by(seurat_clusters, cell_line) %>%
+  summarize(n = n()) %>%
+  mutate(percent = round(100 * n / sum(n), 1)) %>%
+  arrange(seurat_clusters, desc(percent))
+```
+
+```{r}
+# creates small UMAP per cell line, which clusters are present/enriched in each cell line?
+clusters_cellline = DimPlot(seurat_integration, group.by = "seurat_clusters", split.by = "cell_line")
+clusters_cellline
+```
+*SELECTING GENES FOR ANNOTATING CANONICAL PATHWAY*
+```{r}
+# VlnPlot(seurat_integration, features = "VEGFA")
+# FeaturePlot(seurat_integration, features = "VEGFA")
+```
+
+```{r}
+# load in HOXD13 KD up/down regulated genes from Apfelbaum 2022 paper (supplmenetal table s3, NIHMS1814671-supplement-4)
+
+HOXD13_table = read.csv("/projects/bgmp/shared/groups/2025/sarcoma/tnair/HOXD13_KD_regulated_genes.csv",header=TRUE)
+head(HOXD13_table)
+
+# neural-like
+neural_like_genes = HOXD13_table$Gene.name[HOXD13_table$State == "Neural-like"]
+
+# mesenchymal-like
+mes_like_genes = HOXD13_table$Gene.name[HOXD13_table$State == "Mesenchymal-like"]
+
+```
+
+```{r}
+cl0_up = up_reg_markers %>% filter(cluster == 0)
+cl0_up_genes = cl0_up$gene
+length(cl0_up_genes)
+
+# compare c0 upreg genes to HOXD13 programs
+neural_overlap_c0 = intersect(cl0_up_genes, neural_like_genes)
+mes_overlap_c0 = intersect(cl0_up_genes, mes_like_genes)
+length(neural_overlap_c0) # 0
+length(mes_overlap_c0) # 1
+
+# no meaningful neural vs mesenchymal programs
+
+# extract c0 top DEGs
+```
+
+```{r}
+# go through all clusters, upreg genes, try and assign neural-like, mesenchymal-like programs
+# ambiguous/clusters w/o assignment will tackle later on
+
+# upreg genes by cluster
+cluster_up_list = split(up_reg_markers$gene, up_reg_markers$cluster)
+head(cluster_up_list[["0"]]) # genes for cluster 0
+length(cluster_up_list[["0"]]) # 100 genes
+```
+
+```{r}
+# loop to see overlap counts per cluster
+program_results = up_reg_markers %>% 
+  group_by(cluster) %>% 
+  summarize(
+    neural_hits = sum(gene %in% neural_like_genes),
+    mes_hits = sum(gene %in% mes_like_genes),
+    .groups = "drop"
+  )
+
+program_results
+
+# annotation table
+# signal strengths are RELATIVE to other clusters
+
+annotations = program_results %>% 
+  mutate(
+    "HOXD13 signal" = case_when(
+      neural_hits >=3 ~ "strongest neural signal",
+      neural_hits == 1 ~ "weaker neural",
+      mes_hits >= 2 ~ "moderate mesenchymal",
+      mes_hits ==1 ~ "weaker mesenchymal",
+      TRUE ~ "none"
+    ),
+    "Possible annotations" = case_when(
+      neural_hits >=3 ~ "Neural-like",
+      neural_hits == 1 ~ "Possibly neural-like",
+      mes_hits >=2 ~ "Mesenchymal-like",
+      mes_hits == 1 ~ "Possibly mesenchymal-like",
+      TRUE~"Ambiguous/other programs"
+      
+    )
+  )
+annotations
+```
+
+*POSSIBLE ANNOTATIONS*
+
+*NEURAL*
+Cluster 3: Neural-like
+5,8: Weak neural
+
+*MESENCHYMAL*
+1: Moderate mes
+0,6: Weak mes
+
+*NEITHER*
+2,4,7: ambiguous
+
+
+```{r}
+# making new obj so dont overwrite prev one
+obj = seurat_integration
+
+# make sure chars
+#is.character(obj$seurat_clusters)
+obj$seurat_clusters = as.character(obj$seurat_clusters)
+annotations$cluster = as.character(annotations$cluster)
+
+# annotation cols into vectors
+signal_vec = annotations$'HOXD13 signal'
+names(signal_vec) = annotations$cluster
+
+state_vec = annotations$'Possible annotations'
+names(state_vec) = annotations$cluster
+
+# map onto cluster
+mapped_signal = signal_vec[obj@meta.data$seurat_clusters]
+mapped_state = state_vec[obj@meta.data$seurat_clusters]
+
+obj@meta.data$HOXD13_signal = mapped_signal
+obj@meta.data$HOXD13_state = mapped_state
+
+table(obj@meta.data$HOXD13_state)
+head(obj@meta.data[, c("seurat_clusters", "HOXD13_signal", "HOXD13_state")]) # now annotations will be alognside clusters
+
+seurat_integration = obj
+
+```
+
+```{r}
+# umap with new annotations
+DimPlot(
+  seurat_integration,
+  group.by = "HOXD13_state",
+  label = TRUE,
+  repel = TRUE,
+  pt.size = 0.3
+) + ggtitle("HOXD13-based mesenchymal vs neural")
+
+DimPlot(
+  seurat_integration,
+  group.by = "HOXD13_signal",
+  label = TRUE,
+  repel = TRUE,
+  pt.size = 0.3
+)
+
+p1
+```
+
+```{r}
+
+# HOXD13 Programs
+
+# UMAP coordinates + metadata into one data.frame
+emb = Embeddings(seurat_integration, "umap")
+emb = as.data.frame(emb)
+emb$cluster = seurat_integration$seurat_clusters
+emb$HOXD13_state = seurat_integration$HOXD13_state
+emb$cell_line = seurat_integration$cell_line
+emb$Phase = seurat_integration$Phase
+
+# center of each data to place labels
+centers = aggregate(
+  cbind(umap_1, umap_2) ~ cluster,
+  data = emb,
+  FUN = mean
+)
+
+# plot points colored by HOXD13_state, labels are cluster IDs
+hoxd13state_plot = ggplot(emb, aes(x = umap_1, y = umap_2)) +
+  geom_point(aes(color = HOXD13_state), size = 0.3, alpha = 0.8) +
+  geom_text(
+    data = centers,
+    aes(label = cluster),
+    color = "black",
+    fontface = "bold",
+    size = 4
+  ) +
+  theme_classic() +
+  labs(
+    title = "Clusters by HOXD13 programs",
+    color = "HOXD13_state"
+  ) +
+  guides(
+    color = guide_legend(
+      override.aes = list(size = 2) # increase dot size
+    )
+  )
+
+
+(hoxd13state_plot | p2) / clusters_cellline
+
+hoxd13state_plot
+```
+*CELL CYCLE SCORING*
+
+Seurat has CellCycleScoring that assigns cells to diff cell cycle phases G1, S, or G2/M phases
+
+
+```{r}
+
+# want to do cell cycle scoring on RAW data!
+# before default was integratedCCA
+DefaultAssay(seurat_integration) = "GeneExpressionMatrix"
+
+# seurat 2019 updated gene sets
+s_genes = cc.genes.updated.2019$s.genes
+g2m_genes = cc.genes.updated.2019$g2m.genes
+
+# run cell cycle scoring on INTEGRATED OBJ
+seurat_integration = CellCycleScoring(
+  object = seurat_integration,
+  s.features = s_genes,
+  g2m.features = g2m_genes,
+  set.ident = FALSE # so Idents isn't overwritten
+)
+
+# how many cells each phase?
+table(seurat_integration$Phase)
+
+```
+
+```{r}
+# switch back to integrated assay for visualizations
+DefaultAssay(seurat_integration) = "integratedCCA"
+
+# visualize, UMAP colored by cell-cycle phase
+DimPlot(
+  seurat_integration,
+  reduction = "umap",
+  group.by = "Phase",
+  pt.size = 0.3
+) + ggtitle("Cell cycle phase")
+
+# cross reference cluster and phase
+seurat_integration$seurat_clusters = as.character(seurat_integration$seurat_clusters)
+
+# counts
+table(seurat_integration$seurat_clusters, seurat_integration$Phase)
+
+# proportions per cluster
+prop.table(
+  table(seurat_integration$seurat_clusters, seurat_integration$Phase),
+  margin = 1  # row-wise
+)
+
+```
+
+```{r}
+# cell cycle phase and cluster
+ggplot(emb, aes(x = umap_1, y = umap_2)) +
+  geom_point(aes(color = Phase), size = 0.25, alpha = 0.8) +
+  geom_text(
+    data = centers,
+    aes(label = cluster),
+    color = "black",
+    fontface = "bold",
+    size = 4
+  ) +
+  theme_classic() +
+  labs(
+    title = "Cell cycle phase with cluster labels",
+    color = "Phase"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 4)))
+
+```
+*CELL CYCLE STAGES*
+0: G1, WEAK MES
+1: S, MODERATE MES
+2: G2/M, AMBIGUOUS
+3: mixed, NEURAL-LIKE
+4: mixed, AMBIGUOUS
+5: G1, WEAK NEURAL
+6: S, WEAK MES
+7: mixed, AMBIGUOUS
+8: G2/M, WEAK NEURAL
+
+Proliferative: 1,2,6,8
+Low proliferation: 0,5
+Mixed: 3,4,7
+
+--- 
+Confident programs:
+3: mixed, neural-like
+1: S, moderate mes
+
+Program exists, but weaker (remember this is all relative to other clusters):
+* weaker but not necessarily totally ambiguous(?)
+* provisionally labelled
+0: G1, weak mes
+5: G1, weak neural
+6: S, weak mes
+8: G2/M, weak neural
+
+Ambiguous:
+2: G2/M, ambiguous
+4, mixed, ambiguous
+7: mixed, ambiguous
+
+Want to focus on 2,4,7 DEGs and see if can glean more information. 
+
+```{r}
+DimPlot(
+  seurat_integration,
+  group.by = "HOXD13_state",
+  split.by = "Phase",
+  pt.size = 0.25
+)
+
+DimPlot(
+  seurat_integration,
+  group.by = "Phase",
+  split.by = "HOXD13_state",
+  pt.size = 0.25
+)
+
+```
+
+```{r}
+DimPlot(
+  seurat_integration,
+  group.by = "Phase",       # colors = G1 / S / G2M
+  split.by = "cell_line",   # panel per cell line
+  pt.size = 0.25,
+  ncol = 3
+) + ggtitle("Cell cycle phase per cell line")
+
+```
+*REPETITIVE CODE* just double check everythings right
+```{r}
+# UMAP with cell-cycle phase and cluster labels
+
+emb = Embeddings(seurat_integration, "umap") %>% 
+  as.data.frame()
+
+# consistent axes
+emb$umap_1 = emb[,1]
+emb$umap_2 = emb[,2]
+
+# add metadata
+emb$Phase = seurat_integration$Phase
+emb$cluster = seurat_integration$seurat_clusters
+emb$cell_line = seurat_integration$cell_line
+emb$HOXD13_state = seurat_integration$HOXD13_state
+
+# cluster centers for labelling UMAP
+
+centers = emb %>% 
+  group_by(cluster) %>% 
+  summarize(umap_1 = mean(umap_1),
+            umap_2 = mean(umap_2),
+            .groups = "drop")
+
+# plot cell cycle phase w/ cluster labels
+ggplot(emb, aes(x = umap_1, y = umap_2)) +
+  geom_point(aes(color = Phase), size = 0.25, alpha = 0.8) +
+  geom_text(
+    data = centers,
+    aes(label = cluster),
+    color = "black",
+    size = 4,
+    fontface = "bold"
+  ) +
+  theme_classic() +
+  labs(
+    title = "Cell cycle phase with cluster labels",
+    color = "Phase"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 4)))
+```
+
+```{r}
+
+p3 = DimPlot(
+  seurat_integration,
+  reduction = "umap",
+  group.by  = "final_annotation",
+  label     = TRUE,
+  pt.size   = 0.3
+) + ggtitle("Cluster annotations")
+
+p4 = DimPlot(
+  seurat_integration,
+  reduction = "umap",
+  group.by  = "cell_line",
+  pt.size   = 0.3
+) + ggtitle("EwS cell lines")
+
+p3 | p4
+```
+
+
+*DEGS PER CLUSTER*
+
+Defining by mesenchymal-like or neural-like isn't a very strong label, because of how many genes identified (0-3). It's a good way of having some initial indication, but looking into the top DEGs would be a better indication.
+
+
+```{r}
+# function to get top 5 markers per cluster
+top_markers_for_cluster = function(markers, c, n = 5) {
+  markers %>% 
+    filter(cluster == c) %>% 
+    arrange(desc(avg_log2FC)) %>% 
+    slice_head(n=n)
+}
+
+# use fxn to get 5 DEGS per cluster
+top0 = top_markers_for_cluster(up_reg_markers, 0, n=10)
+top1 = top_markers_for_cluster(up_reg_markers, 1, n=10)
+top2 = top_markers_for_cluster(up_reg_markers, 2, n=10)
+top3 = top_markers_for_cluster(up_reg_markers, 3, n=10)
+top4 = top_markers_for_cluster(up_reg_markers, 4, n=10)
+top5 = top_markers_for_cluster(up_reg_markers, 5, n=10)
+top6 = top_markers_for_cluster(up_reg_markers, 6, n=10)
+top7 = top_markers_for_cluster(up_reg_markers, 7, n=10)
+top8 = top_markers_for_cluster(up_reg_markers, 8, n=10)
+
+head(top0, n=10)
+head(top1, n=10)
+head(top2, n=10)
+head(top3, n=10)
+head(top4, n=10)
+head(top5, n=10)
+head(top6, n=10)
+head(top7, n=10)
+head(top8, n=10)
+
+top0_genes = c("FBXO32", "MIR34AHG", "TRIM22", "ITGBL1")
+top1_genes = c("CAMK4", "TP73", "FAM111B", "E2F2")
+top2_genes = c("PIF1", "PSRC1", "ARHGAP11B", "APOLD1")
+top3_genes = c("CIB4", "IL1RAPL2", "MROH2A", "HS3ST2")
+top4_genes = c("IL3RA", "SYT6", "IER2", "JUNB")
+top5_genes = c("SYT4", "PCDH15", "BRINP3", "SLC34A2")
+top6_genes = c("PRLR", "CRYBA2", "HCN1", "COL14A1")
+top7_genes = c("DMRT2", "UNC13C", "CCDC26", "CA8")
+# "identity" markers
+top8_genes = c("CENPF", "MKI67", "HIST1H2BN", "HMMR") # proliferation markers, cell-cycle genes
+
+```
+
+
+```{r}
+# final annotation labels
+seurat_integration$final_annotation = recode(
+  seurat_integration$seurat_clusters,
+  "0" = "Mesenchymal-like",
+  "1" = "Mesenchymal-like (proliferative)",
+  "2" = "Mitotic (proliferative)",
+  "3" = "Neural-like",
+  "4" = "Stress/mixed program",
+  "5" = "Neural-like",
+  "6" = "Hybrid neural–mes (proliferative)",
+  "7" = "Neural-like",
+  "8" = "Highly proliferative"
+)
+
+table(seurat_integration$final_annotation)
+```
+
+```{r}
+# final cluster annotations and ews clusters
+p3 = DimPlot(seurat_integration, group.by="final_annotation", pt.size = 0.3, label=TRUE) + ggtitle("Cluster annotations")
+p4 = DimPlot(seurat_integration, group.by="cell_line", pt.size = 0.3) + ggtitle("EwS Clusters")
+
+(p3 | p1)
+
+# p2
+```
+*Looking at some markers for genes to determine expression across clusters*
+
+Are these gene markers unique to clusters or "falsely" being identified as top markers.
+Remember top marker expression is relative to other genes w/i same cluster.
+```{r}
+markers_to_plot = c(
+  # cluster 0
+  "FBXO32", "ITGBL1",
+  # cluster 1
+  "CAMK4", "E2F2",
+  # cluster 2
+  "PIF1",
+  # cluster 3
+  "IL1RAPL2", "HS3ST2",
+  # cluster 4
+  "JUNB",
+  # cluster 5
+  "SYT4", "BRINP3",
+  # cluster 6
+  "HCN1", "COL14A1",
+  # cluster 7
+  "DMRT2", "CA8",
+  # cluster 8
+  "MKI67", "CENPF"
+)
+```
+
+```{r}
+fp = FeaturePlot(
+  seurat_integration,
+  features = markers_to_plot,
+  pt.size = 0.25,
+  ncol = 4
+) &
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank()
+  )
+
+fp
+```
+
+```{r}
+vp = VlnPlot(
+  seurat_integration,
+  features = markers_to_plot,
+  group.by = "seurat_clusters",
+  pt.size = 0.1,
+  ncol = 4
+) &
+  theme(
+    axis.title.x = element_blank()
+  )
+
+vp
+```
+```{r}
+FeaturePlot(
+  seurat_integration,
+  features = c("CENPF", "MKI67", "HIST1H2BN", "HMMR"),
+  ncol = 2,
+  pt.size = 0.25
+)
+
+VlnPlot(
+  seurat_integration,
+  features = c("CENPF", "MKI67", "HIST1H2BN", "HMMR"),
+  group.by = "seurat_clusters",
+  ncol = 2,
+  pt.size = 0.1
+)
+```
+
+```{r}
+DefaultAssay(seurat_integration)
+Reductions(seurat_integration)
+```
+
+To further validate/substantiate prev cluster annotations
+
+*MODULE SCORES*
+
+```{r}
+# STEP 1: load HOXD13 gene sets
+# HOXD13_table = read.csv("/projects/bgmp/shared/groups/2025/sarcoma/tnair/HOXD13_KD_regulated_genes.csv",header=TRUE)
+head(HOXD13_table)
+names(HOXD13_table) #gene.name, regulation, state
+
+# HOXD13-based EwS programs
+hox_neural_genes = HOXD13_table$Gene.name[HOXD13_table$State == "Neural-like"]
+hox_mes_genes = HOXD13_table$Gene.name[HOXD13_table$State == "Mesenchymal-like"]
+
+# genes in RNA assay
+rna_genes = rownames(seurat_integration[["GeneExpressionMatrix"]])
+keep_rna = function(x) intersect(x, rna_genes) # fxn to keep whichever genes intersect b/w gene set + seurat obj
+
+hox_neural_genes = keep_rna(hox_neural_genes)
+hox_mes_genes = keep_rna(hox_mes_genes)
+
+length(hox_neural_genes) # how many genes are present in data?
+length(hox_mes_genes)
+```
+
+```{r}
+# STEP 2: MSigDB pathways
+
+# Hallmark gene sets
+msig_hallmark = msigdbr(species = "Homo sapiens", category = "H")
+
+hallmark_emt_genes = msig_hallmark %>% filter(gs_name == "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION") %>% pull(gene_symbol)
+hallmark_g2m_genes = msig_hallmark %>% filter(gs_name == "HALLMARK_G2M_CHECKPOINT") %>% pull(gene_symbol)
+hallmark_e2f_genes = msig_hallmark %>% filter(gs_name == "HALLMARK_E2F_TARGETS") %>% pull(gene_symbol)
+
+# GO: BP (C5) gene sets
+# neural programs
+msig_go = msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
+
+go_neurogenesis_genes = msig_go %>% filter(gs_name == "GOBP_NEUROGENESIS") %>% pull(gene_symbol)
+go_neuron_diff_genes = msig_go %>% filter(gs_name == "GOBP_NEURON_DIFFERENTIATION") %>% pull(gene_symbol)
+go_neuron_dvlpmnt = msig_go %>% filter(gs_name == "GOBP_NEURON_DEVELOPMENT") %>% pull(gene_symbol)
+go_neuralcrest = msig_go %>% filter(gs_name == "GOBP_NEURAL_CREST_CELL_FATE_COMMITMENT") %>% pull(gene_symbol)
+
+
+go_ecm = msig_go %>% filter(gs_name == "GOBP_EXTRACELLULAR_MATRIX_ORGANIZATION") %>% pull(gene_symbol)
+go_adhesion = msig_go %>% filter(gs_name == "GOBP_BIOLOGICAL_ADHESION") %>% pull(gene_symbol)
+go_cellmig = msig_go %>% filter(gs_name == "GOBP_CELL_MIGRATION") %>% pull(gene_symbol)
+go_mesen = msig_go %>% filter(gs_name == "GOBP_MESENCHYME_DEVELOPMENT") %>% pull(gene_symbol)
+
+
+# STEP 3: Build module scores
+
+
+# intersect with expressed genes
+# addmodulescore can only compute score using genes present in seurat obj
+hallmark_emt_genes = keep_rna(hallmark_emt_genes)
+hallmark_g2m_genes = keep_rna(hallmark_g2m_genes)
+hallmark_e2f_genes = keep_rna(hallmark_e2f_genes)
+
+go_neurogenesis_genes = keep_rna(go_neurogenesis_genes)
+go_neuron_diff_genes = keep_rna(go_neuron_diff_genes)
+go_neuron_dvlpmnt = keep_rna(go_neuron_dvlpmnt)
+go_neuralcrest = keep_rna(go_neuralcrest)
+
+go_ecm = keep_rna(go_ecm)
+go_adhesion = keep_rna(go_adhesion)
+go_cellmig = keep_rna(go_cellmig)
+go_mesen = keep_rna(go_mesen)
+
+# quick check of genes per set
+sapply(
+  list(
+    hox_neural = hox_neural_genes,
+    hox_mes = hox_mes_genes,
+    H_EMT = hallmark_emt_genes,
+    H_G2M = hallmark_g2m_genes,
+    H_E2F = hallmark_e2f_genes,
+    GO_neurogenesis = go_neurogenesis_genes, # a lot of genes, broad
+    GO_neuron_diff = go_neuron_diff_genes, # 0 genes
+    GO_neuron_dvlp = go_neuron_dvlpmnt,
+    GO_ncrest = go_neuralcrest,
+    GO_ecm = go_ecm, # 0 genes
+    GO_adh = go_adhesion, # 0 genes
+    GO_mesen = go_mesen,
+    GO_cellmig = go_cellmig
+  ),
+  length
+)
+```
+
+```{r}
+# STEP 4: Run AddModuleScore, add to obj
+
+# change default assay to RNA
+DefaultAssay(seurat_integration) = "GeneExpressionMatrix"
+DefaultAssay(seurat_integration)
+
+
+# HOXD13 scores
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(hox_neural_genes),
+  name = "HOXD13_neural"
+)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(hox_mes_genes),
+  name = "HOXD13_mes"
+)
+
+# Hallmark scores
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(hallmark_emt_genes),
+  name = "H_EMT"
+)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(hallmark_g2m_genes),
+  name = "H_G2M"
+)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(hallmark_e2f_genes),
+  name = "H_E2F"
+)
+
+# GO neural/mesenchymal scores
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(go_neurogenesis_genes),
+  name = "GO_neurogenesis"
+)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(go_neuron_dvlpmnt),
+  name = "GO_neuron_dvlpmnt"
+)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(go_neuralcrest),
+  name = "GO_neuralcrest"
+)
+
+# mesenchymal-like (?)
+
+seurat_integration = AddModuleScore(
+  seurat_integration,
+  features = list(go_mesen),
+  name = "GO_mesen"
+)
+
+tail(colnames(seurat_integration@meta.data))
+
+# seurat adds 1 to the end of the names above, so ex: H_G2M1, H_E2F1
+```
+
+```{r}
+# STEP 5: visualizations
+
+# HOXD13 neural vs mesenchymal
+
+FeaturePlot(
+  seurat_integration,
+  features = c("HOXD13_neural1", "HOXD13_mes1"),
+  pt.size = 0.3
+)
+
+
+# mesenchymal-ish
+
+FeaturePlot(
+  seurat_integration,
+  features = c("H_EMT1", "GO_mesen1"),
+  pt.size = 0.3
+)
+
+
+# Neural programs
+FeaturePlot(
+  seurat_integration,
+  features = c("GO_neurogenesis1", "GO_neuron_dvlpmnt1", "GO_neuralcrest1"),
+  pt.size = 0.3
+)
+
+# cell cycle/proliferation
+FeaturePlot(
+  seurat_integration,
+  features = c("H_G2M1", "H_E2F1"),
+  pt.size = 0.3
+)
+
+```
+GO_neurogenesis and GO_neuron_dvlpmnt are TOO broad for cluster assignment
+
+```{r}
+DimPlot(seurat_integration, group.by = "seurat_clusters", label = TRUE, repel = TRUE)
+```
+```{r, fig.height = 12}
+VlnPlot(
+  seurat_integration,
+  features = c("HOXD13_neural1", "HOXD13_mes1", "H_EMT1", "GO_mesen1",
+               "GO_neuralcrest1", "H_G2M1", "H_E2F1"),
+  group.by = "seurat_clusters",
+  pt.size = 0,
+  ncol = 3
+)
+
+```
+
+```{r, fig.width = 12}
+VlnPlot(
+  seurat_integration,
+  features = c("GO_neurogenesis1", "GO_neuron_dvlpmnt1"),
+  group.by = "seurat_clusters",
+  pt.size = 0,
+  ncol = 3
+)
+```
+
+```{r}
+# define your module score columns
+program_cols <- c(
+  "HOXD13_neural1", "HOXD13_mes1",
+  "H_EMT1", "H_G2M1", "H_E2F1",
+  "GO_neurogenesis1", "GO_neuron_dvlpmnt1",
+  "GO_neuralcrest1", "GO_mesen1"
+)
+
+
+# compute cluster averages
+cluster_program_means <- seurat_integration@meta.data %>%
+  group_by(seurat_clusters) %>%
+  summarise(across(all_of(program_cols), mean, na.rm = TRUE))
+
+# convert to matrix for heatmap
+mat <- as.matrix(cluster_program_means[ , -1])
+rownames(mat) <- cluster_program_means$seurat_clusters
+
+# scale by row (optional)
+pheatmap(mat,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         scale = "row",
+         border_color = NA,
+         fontsize_row = 12,
+         fontsize_col = 12)
+```
+
+*FINAL ANNOTATIONS*
+
+*VERIFYING MODULE SCORES*
+```{r}
+
+# VIEW MODULE SCORES, confusion when looking at gene markers and heatmap, this is more informative
+seurat_integration@meta.data %>%
+  group_by(seurat_clusters) %>%
+  summarise(
+    HOXD13_neural = median(HOXD13_neural1),
+    HOXD13_mes   = median(HOXD13_mes1),
+    G2M          = median(H_G2M1),
+    E2F          = median(H_E2F1),
+    EMT          = median(H_EMT1)
+  )
+
+```
+```{r}
+# FINAL cluster annotations (lineage/program identity)
+
+# recode() transform or replace old values in vector
+seurat_integration$final_annotation = 
+  recode(seurat_integration$seurat_clusters,
+         "0" = "Stress-like",
+         "1" = "Mesenchymal-like",
+         "2" = "Mesenchymal-like (highly proliferative)",
+         "3" = "Neural-like",
+         "4" = "Stress-like",
+         "5" = "Neural-like",
+         "6" = "Mixed neural/mesenchymal",
+         "7" = "Neural crest-like",
+         "8" = "Highly proliferative")
+
+# order factors so it plots in order, consistent legend order
+seurat_integration$final_annotation = factor(
+  seurat_integration$final_annotation,
+  levels = c(
+    "Stress-like",
+    "Mesenchymal-like",
+    "Mesenchymal-like (highly proliferative)",
+    "Neural-like",
+    "Mixed neural/mesenchymal",
+    "Neural crest-like",
+    "Highly proliferative"
+  )
+)
+
+# check 
+table(seurat_integration$seurat_clusters,
+      seurat_integration$final_annotation)
+# plots
+
+clust_ann = DimPlot(
+  seurat_integration,
+  group.by = "final_annotation",
+  label = TRUE,
+  repel = TRUE,
+  pt.size = 0.3
+) + ggtitle("Cluster annotations")
+
+clust_cls = DimPlot(
+  seurat_integration,
+  group.by = "cell_line",   # or "orig.ident" / whatever your column is
+  label = FALSE,
+  pt.size = 0.3
+)
+
+clust_ann + clust_cls
+
+```
+```{r}
+# change color of cell lines for better readability 
+cell_colors = c(
+  "A4573"  = "#E66101",  # orange
+  "A673"   = "#B2182B",  # deep red/magenta
+  "CHLA10" = "#1A9850",  # green
+  "CHLA9"  = "#6B6DAA",  # slate blue (muted)
+  "PDX305" = "#1B9E77",  # teal-green, distinct
+  "RDES"   = "#762A83",  # royal purple
+  "SKNMC"  = "#66C2A5",  # cyan
+  "TC32"   = "#8C510A",  # NEW: deep brown
+  "TC71"   = "#FFD92F"   # gold
+)
+
+cell_colors2 = c(
+  "A4573" = "#E69F00",  # orange
+  "A673"  = "#56B4E9",  # light blue
+  "CHLA10"= "#009E73",  # bluish green
+  "CHLA9" = "#F0E442",  # yellow
+  "PDX305"= "#0072B2",  # dark blue
+  "RDES"  = "#D55E00",  # reddish orange
+  "SKNMC" = "#CC79A7",  # purple/pink
+  "TC32"  = "#000000",  # black
+  "TC71"  = "#9A6324"   # brown
+)
+
+cell_colors3 <- c(
+  "A4573"  = "#E66101",  # orange
+  "A673"   = "#B2182B",  # red
+  "CHLA10" = "#1B7837",  # darker forest green
+  "CHLA9"  = "#6B6DAA",  # slate blue
+  "PDX305" = "#01665E",  # dark teal
+  "RDES"   = "#762A83",  # purple
+  "SKNMC"  = "#A6CEE3",  # pale sky blue
+  "TC32"   = "#8C510A",  # brown
+  "TC71"   = "#FFD92F"   # yellow
+)
+
+cell_colors4 <- c(
+  "A4573" = "#FF6B6B",   # red
+  "A673"  = "#4ECDC4",   # turquoise
+  "CHLA10"= "#FFA600",   # orange
+  "CHLA9" = "#1A535C",   # deep teal
+  "PDX305"= "#9B5DE5",   # purple
+  "RDES"  = "#00BBF9",   # cyan
+  "SKNMC" = "#FF4D94",   # hot pink
+  "TC32"  = "#2EC4B6",   # aqua green
+  "TC71"  = "#5F0F40"    # wine-dark purple
+)
+
+cl_clusts = DimPlot(
+  seurat_integration,
+  group.by = "cell_line",
+  label = FALSE,
+  pt.size = 0.2
+) +
+  scale_color_manual(values = cell_colors) +
+  ggtitle("Cell lines") +
+  theme_classic(base_size = 16) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_blank()
+  )
+
+clust_ann + cl_clusts
+combined_clust_cl = clust_ann + cl_clusts
+# save plots
+ggsave("final_cluster_annotations.png", plot=clust_ann, width = 13, height = 7, dpi = 300, bg = "white")
+ggsave("cl_clusters_final.png", plot=cl_clusts, width = 13, height = 7, dpi = 300, bg = "white")
+ggsave("combined_clust_cls.png", plot=combined_clust_cl, width = 15, height = 7, dpi = 300, bg = "white")
+```
+
+*save integrated obj for GSEA/GO analysis locally*
+```{r}
+
+# check integrated obj has everything i need
+Assays(seurat_integration)
+Reductions(seurat_integration)
+colnames(seurat_integration@meta.data)
+grep("final_annotation", colnames(seurat_integration@meta.data), value = TRUE)
+
+head(Idents(seurat_integration))
+
+# save obj (newer than what you transferred to vini)
+saveRDS(seurat_integration, file = "seurat_integration_finalAnnotations.rds")
+```
+
+*STREAMLINE OBJ FOR LOCAL GSEA/GO USE*
+
+```{r}
+# load ANNOTATED seurat integrated obj
+seurat_integration = readRDS("seurat_integration_finalAnnotations.rds")
+```
+
+```{r}
+# RNA only copy
+seurat_rna_only = seurat_integration
+
+# remove unneeded assays
+# keep RNA assay as default
+DefaultAssay(seurat_rna_only) = "GeneExpressionMatrix"
+seurat_rna_only[["ATAC"]] = NULL
+seurat_rna_only[["MotifMatrix"]] = NULL
+seurat_rna_only[["GeneScoreMatrix"]] = NULL
+seurat_rna_only[["integratedCCA"]] = NULL
+
+# remove atac related metadata
+atac_cols = grep(
+  "nDiFrags|nFrags|nMonoFrags|nMultiFrags|FRIP|TSSEnrichment|Peaks|Promoter|Blacklist|ReadsIn",
+  colnames(seurat_rna_only@meta.data),
+  value = TRUE
+)
+
+seurat_rna_only@meta.data[, atac_cols] = NULL
+
+# save slimmed down obj
+saveRDS(seurat_rna_only, file="seurat_rna_only_forGSEA_GO.rds")
+```
+
+*wanted to try using scCustomize*
+```{r}
+# using scCustomize to see if plots look cleaner
+# clusters 
+sc_annot = DimPlot_scCustom(
+  seurat_object = seurat_integration,
+  group.by      = "final_annotation",
+  pt.size       = 0.1,      # adjust if you want denser / lighter points
+  label         = TRUE,
+  label.size    = 3,
+  shuffle       = TRUE,     # shuffle order to reduce overplotting bias
+  reduction     = "umap"
+) +
+  ggtitle("Cluster annotations") +
+  Blank_Theme() +                # remove axes/labels
+  Move_Legend("right")           # legend on the right
+
+# cell lines
+sc_cell = DimPlot_scCustom(
+  seurat_object = seurat_integration,
+  group.by      = "cell_line",
+  pt.size       = 0.1,
+  label         = FALSE,
+  shuffle       = TRUE,
+  reduction     = "umap"
+) +
+  ggtitle("Cell lines") +
+  Blank_Theme() +
+  Move_Legend("right")
+
+# side-by-side layout
+sc_annot + sc_cell
+```
+

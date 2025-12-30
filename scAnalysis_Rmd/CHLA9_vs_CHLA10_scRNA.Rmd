@@ -1,0 +1,264 @@
+---
+title: "CHLA9_vs_CHLA10_scRNA"
+author: "Thejes Nair"
+date: "2025-12-18"
+output: html_document
+---
+
+
+```{r}
+library(Seurat)
+library(tidyverse)
+library(clusterProfiler)
+library(msigdbr)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggplot2)
+library(svglite)
+```
+
+*Narrowed focus on CHLA9, CHLA10 from previous scRNA Seurat work*
+
+*CHLA9 CHLA10 UMAP*
+
+```{r}
+# read in integrated rds obj
+seu_rna = readRDS("/Users/thejesnair/Desktop/KCGIP/EwS/seurat_integration_finalAnnotations.rds")
+```
+
+```{r}
+# metadata cols
+colnames(seu_rna@meta.data) # cell_line
+```
+
+```{r}
+# subset
+chla = subset(seu_rna, cell_line %in% c("CHLA9", "CHLA10"))
+
+table(chla$cell_line)
+```
+
+```{r, fig.width = 15}
+DimPlot(chla, reduction = "umap", group.by = "cell_line")
+#DimPlot(chla, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+DimPlot(chla, reduction = "umap", group.by = "final_annotation", label = TRUE,
+        label.size=6)
+```
+
+
+Evidence that CHLA10 is modestly enriched for certain rare states (clusters 3/5/8), which may reflect treatment-associated shifts, but these are low-abundance populations and need confirmation.
+
+
+```{r}
+# CHLA cluster distribution
+tab_counts = table(chla$final_annotation, chla$cell_line)
+tab_counts
+
+# summarize by final annotation states not cluster IDs
+tab_props = prop.table(tab_counts, margin = 2)
+round(tab_props, 3)
+
+
+#tab_state = table(chla$final_annotation, chla$cell_line)
+#round(prop.table(tab_state, margin=2), 3)
+
+df_props = as.data.frame(tab_props)
+colnames(df_props) <- c("final_annotation", "cell_line", "prop")
+
+ggplot(df_props, aes(x = cell_line, y = prop, fill = final_annotation)) +
+  geom_col() +
+  ylab("Proportion of cells") +
+  xlab("") +
+  theme_classic(base_size=15) + 
+  scale_fill_manual(values = c(
+  "Stress-like" = "#D55E00",
+  "Mesenchymal-like" = "#E69F00",
+  "Mesenchymal-like (highly proliferative)" = "#009E73",
+  "Neural-like" = "#0072B2",
+  "Mixed neural/mesenchymal" = "#999999",
+  "Highly proliferative" = "#CC79A7"
+))
+
+ggsave("CHLA9_vs_CHLA10_transcriptional_programs.png", units = "in", width=10, height=8, dpi=900)
+ggsave("CHLA9_vs_CHLA10_transcriptional_programs.svg", width=10, height=8, dpi=900)
+```
+
+CHLA9 and CHLA10 occupy a shared transcriptional state space with no evidence for the emergence of novel cell states post-treatment.
+
+Differences between the two cell lines are driven primarily by shifts in the relative abundance of existing transcriptional states, rather than strong within-state heterogeneity or subclustering.
+
+The most abundant and well-powered states (Stress-like and Mesenchymal-like) were selected for within-state differential expression analysis to assess treatment-associated transcriptional changes while avoiding confounding from cell-state composition.
+
+Additional states (Neural-like and Highly proliferative) show very modest enrichment in CHLA10 relative to CHLA9, but remain low-abundance populations. Therefore, they are interpreted as supportive evidence of treatment associated shifts in program usage, rather than primary drivers of transcriptional differences.
+
+Across all states, substantial overlap in UMAP space indicates continuity and plasticity of transcriptional programs, consistent with state transitions rather than discrete, treatment-induced subpopulations.
+
+
+*Treatment is associated with redistribution of conserved transcriptional states, with only subtle shifts in program usage within rare populations. Therefore, downstream analyses focus on within-state differential expression in well-powered states.*
+
+```{r}
+DimPlot(chla, reduction="umap", group.by="final_annotation",
+        split.by="cell_line", label=TRUE, repel=TRUE)
+```
+
+```{r}
+#exists("seurat_integration")
+seu_rna
+```
+
+```{r}
+seu_rna@assays
+seu_rna@reductions
+```
+
+*Find markers*
+
+Previously used FindAllMarkers() to find DEG between all cell lines.
+Since we're focusing on 2 cell lines now, use **FindMarkers**
+
+"FindMarkers - Finds markers (differentially expressed genes) for identity classes"
+
+"FindAllMarkers - Finds markers (differentially expressed genes) for each of the identity classes in a dataset"
+
+https://www.biostars.org/p/409790/
+
+Focusing on stress-like and mesenchymal-like states
+
+```{r}
+# subset the diff transcriptional state programs
+sub_stress = subset(chla, subset=final_annotation =="Stress-like")
+sub_mes = subset(chla, subset=final_annotation == "Mesenchymal-like")
+
+# set idents to cell lines
+Idents(sub_stress) = "cell_line"
+table(sub_stress$cell_line) # cell counts for cell line cluster
+
+# find all markers
+de_stress = FindMarkers(
+  sub_stress,
+  ident.1 = "CHLA10",
+  ident.2 = "CHLA9",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
+)
+
+# REPEAT for mes state
+Idents(sub_mes) = "cell_line"
+table(sub_mes$cell_line)
+
+de_mes = FindMarkers(
+  sub_mes,
+  ident.1="CHLA10",
+  ident.2="CHLA9",
+  logfc.threshold=0.25,
+  min.pct=0.1
+)
+```
+
+```{r}
+de_stress
+de_mes
+
+# sort by adj p-val
+de_stress2 = de_stress %>% 
+  rownames_to_column("gene") %>% 
+  arrange(p_val_adj)
+
+de_mes2 = de_mes %>% 
+  rownames_to_column("gene") %>% 
+  arrange(p_val_adj)
+
+# sanity check
+sum(de_stress2$p_val_adj <= 0.05, na.rm = TRUE) # gene count
+sum(de_mes2$p_val_adj <= 0.05, na.rm = TRUE)
+```
+
+```{r}
+# table of genes
+sig_stress = de_stress2 %>% 
+  filter(p_val_adj <=0.05, abs(avg_log2FC) >= 0.5) %>% 
+  select(gene, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+
+sig_mes = de_mes2 %>% 
+  filter(p_val_adj <=0.05, abs(avg_log2FC) >= 0.5) %>% 
+  select(gene, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+
+nrow(sig_stress); nrow(sig_mes)
+```
+
+Reminder:
+pct.1, pct.2
+fraction of cells in x cell line/state that expresses this gene
+
+so
+pct.1 = 0.300
+30% of cells in CHLA10 express this gene 
+pct.2 = 0.00
+0% of cells in CHLA9 express this gene
+
+```{r}
+# top 50 genes
+top_stress = sig_stress %>% 
+  slice_max(abs(avg_log2FC), n=50)
+
+top_mes = sig_mes %>% 
+  slice_max(abs(avg_log2FC), n=50)
+
+top_stress; top_mes
+```
+```{r}
+# save all markers
+write.csv(de_stress2, "DEG_CHLA9_vs_CHLA10_StressLike_all.csv", row.names=FALSE)
+write.csv(de_mes2, "DEG_CHLA9_vs_CHLA10_MesenchymalLike_all.csv", row.names=FALSE)
+
+# save TOP degs
+write.csv(top_stress, "top50deg_CHLA9_vs_CHLA10_StressLike.csv", row.names=FALSE)
+write.csv(top_mes, "top50deg_CHLA9_vs_CHLA10_MesenchymalLike.csv", row.names=FALSE)
+```
+
+*Cell cycle comparison*
+Similar medians b/w two cell lines, no dramatic shift
+However, CHLA10 has a wider upper tail in both S and G2M: more CHLA10 cells have a higher proliferation score
+
+Heterogeneity in terms of proliferation intensity(?) but not a widespread change in cell cycle state b/w the two
+
+
+Proportion table:
+CHLA10, fewer cells in G1, more cells in G2M/S relative to CHLA9:
+supports mild proliferative shift POST-treatment, but not a large shift
+```{r}
+VlnPlot(chla, features = c("S.Score","G2M.Score"), group.by = "cell_line", pt.size = 0)
+prop.table(table(chla$Phase, chla$cell_line), margin = 2)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
