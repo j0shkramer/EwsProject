@@ -668,3 +668,30 @@ Having errors installing packages in R (computer broke sad)
 Editting Nextflow script to subset haplotagged reads for the region of the SUCLA2 and HIVE3P jersey
 
 Created new directory called HIVE3P_SUCLA2_Fusion that is located on Talapas. It is also on my local computer but it's too large to upload to GitHub.
+
+# Monday, December 29th
+
+## Exploring HIVE3P-SUCLA2 Fusion
+
+Comparing the amount of methylated bases, both 6mA (open chromatin) and 5mC (methylation, usually upregulated) in wildtype, fusion and non-fusion
+
+Fusion occured at Chromosome 1: 41542976 - Chromosome 13: 47972732
+
+There does not appear to be any difference in chromatin openedness or methylated cytosines
+
+| Cell Line | HIVE3P Wildtype 6mA | HIVE3P Fusion 6mA | SUCLA2 Wildtype 5mC | SUCLA2 Fusion 5mC |
+| --------- | ------------ | ---------- | ------------ | ---------- |
+| A673      | Reads did not phase |            |              |            |
+| CHLA10    | Open | Open | None nearby | None nearby |
+| TC32      |              |            |              |            |
+
+
+| Cell Line | HIVE3P 6mA | HIVE3P 5mC | SUCLA2 6mA | SUCLA2 5mC |
+| --------- | ---------- | ---------- | ---------- | ---------- |
+| A4573     |            |            |            |            |
+| CHLA9     | Open | Some nearby | Open | Some nearby |
+| PDX305    |            |            |            |            |
+| RDES      |            |            |            |            |
+| SKNMC     |            |            |            |            |
+| TC71      |            |            |            |            |
+
