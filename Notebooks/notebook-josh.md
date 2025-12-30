@@ -679,19 +679,5 @@ Fusion occured at Chromosome 1: 41542976 - Chromosome 13: 47972732
 
 There does not appear to be any difference in chromatin openedness or methylated cytosines
 
-| Cell Line | HIVE3P Wildtype 6mA | HIVE3P Fusion 6mA | SUCLA2 Wildtype 5mC | SUCLA2 Fusion 5mC |
-| --------- | ------------ | ---------- | ------------ | ---------- |
-| A673      | Reads did not phase |            |              |            |
-| CHLA10    | Open | Open | None nearby | None nearby |
-| TC32      |              |            |              |            |
-
-
-| Cell Line | HIVE3P 6mA | HIVE3P 5mC | SUCLA2 6mA | SUCLA2 5mC |
-| --------- | ---------- | ---------- | ---------- | ---------- |
-| A4573     |            |            |            |            |
-| CHLA9     | Open | Some nearby | Open | Some nearby |
-| PDX305    |            |            |            |            |
-| RDES      |            |            |            |            |
-| SKNMC     |            |            |            |            |
-| TC71      |            |            |            |            |
+I orginally had a table to organize my progress, but it was all similar so kinda a waste of space
 
