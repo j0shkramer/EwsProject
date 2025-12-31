@@ -70,9 +70,10 @@ colnames(df_props) <- c("final_annotation", "cell_line", "prop")
 
 ggplot(df_props, aes(x = cell_line, y = prop, fill = final_annotation)) +
   geom_col() +
+  labs(fill="Transcriptional programs")+
   ylab("Proportion of cells") +
   xlab("") +
-  theme_classic(base_size=15) + 
+  theme_classic(base_size=18) + 
   scale_fill_manual(values = c(
   "Stress-like" = "#D55E00",
   "Mesenchymal-like" = "#E69F00",

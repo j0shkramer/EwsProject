@@ -14,6 +14,7 @@ library(GenomicRanges)
 library(ggplot2)
 library(biovizBase)
 library(EnsDb.Hsapiens.v86)
+library(ggrepel)
 ```
 
 Differential chromatin accessibility between CHLA9 and CHLA10
@@ -82,7 +83,7 @@ lr_da_peaks
 lr_da_peaks2 = lr_da_peaks %>% 
   rownames_to_column("peak") %>% 
   arrange(p_val_adj) %>% 
-  select(peak, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
+  dplyr::select(peak, p_val_adj, avg_log2FC, pct.1, pct.2, p_val)
 
 lr_da_peaks2
 
@@ -302,6 +303,76 @@ head(sig_da_anno)
 write.csv(sig_da_anno, "DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv", row.names=FALSE)
 ```
 
+
+*Label volcano plot with significant genes*
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+# had to reload data from csv file because issues with RStudio, forgot to save .rds
+lr_da_peaks2 = read.csv("DA_peaks_CHLA9_vs_CHLA10_scATAC.csv")
+sig_da_anno  = read.csv("DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv")
+
+# select labels
+labels_df = sig_da_anno %>%
+  filter(p_val_adj < 1e-30, abs(avg_log2FC) > 2) %>%
+  mutate(
+    score = -log10(p_val_adj),
+    direction = ifelse(avg_log2FC > 0, "CHLA9", "CHLA10")
+  ) %>%
+  group_by(direction) %>%
+  slice_max(order_by = score, n = 15) %>%   # can adjust
+  ungroup() %>%
+  distinct(peak, .keep_all = TRUE) %>%
+  select(peak, gene)
+
+
+plot_df = lr_da_peaks2 %>%
+  mutate(Direction = case_when(
+    p_val_adj <= 0.05 & avg_log2FC >= 0.25 ~ "More open in CHLA9",
+    p_val_adj <= 0.05 & avg_log2FC <= -0.25 ~ "More open in CHLA10",
+    TRUE ~ "Not sig"
+  ))
+
+volcano_genes = ggplot(plot_df, aes(x = avg_log2FC, y = -log10(p_val_adj), color = Direction)) +
+  geom_point(alpha = 0.6, size = 1) +
+  theme_classic(base_size = 18) +
+  xlab("log2FC accessibility (CHLA9 − CHLA10)") +
+  ylab("-log10(adj p-value)") +
+  #ggtitle("Differential accessibility (ATAC): CHLA9 vs CHLA10") +
+  geom_label_repel( # repel adds box around label vs geom_label_text
+    data = plot_df %>% inner_join(labels_df, by = "peak"),
+    aes(label = gene),
+    size = 3.5,
+    max.overlaps = Inf,
+    box.padding = 0.6, # space around text
+    point.padding = 0.8, # space around dot
+    segment.size = 0.25,
+    force=10,
+    show.legend = FALSE
+  ) +
+  theme(
+    legend.title=element_text(size=16),
+        legend.text=element_text(size=14)) +
+  guides(
+    color=guide_legend(
+      override.aes=list(size=3)
+    )
+  ) +
+  scale_color_manual(
+    name="Direction",
+    values = c(
+  "More open in CHLA10" = "#0072B2",
+  "More open in CHLA9"  = "#C76E00",
+  "Not sig"             = "grey80"
+)
+  )
+
+volcano_genes
+ggsave("DA_CHLA9_CHLA10_figure.svg", width=10, height=8, dpi=900)
+```
+
 ```{r}
 # sanity check to make sure mapping worked
 sum(is.na(sig_da_anno$gene))
@@ -468,7 +539,7 @@ To summarize again:
 
 The whole reason we're looking at genescorematrix is to look at the area AROUND the open region of chromatin and determine how permissive it is (is the area open and accessible for the cell to turn that gene on), then we can compare to the actual RNA DEG results and see if there's overlap and agreement 
 ```{r}
-# gene-centric converage (RNA DEGs + GeneScore DEGs)
+# gene-centric coverage (RNA DEGs + GeneScore DEGs)
 
 # USE this from earlier
 #deg_genes = unique(c(de_stress2$gene, de_mes2$gene))
@@ -495,7 +566,8 @@ head(convergent_genes, 20)
 3. nearby DA peak
  local regulatory DNA that is open/closed
  
-answers question which genes show coordinated regulatory and transcriptional changes?
+Identifies genes supported by RNA expression changes, gene-level chromatin accessibility, and ATAC DA peaks (directionality not assumed across all 3).
+
 ```{r}
 colnames(de_stress2)
 colnames(de_mes2)
@@ -520,7 +592,9 @@ triple_convergent = convergent_genes2 %>%
 triple_convergent
 #nrow(convergent_genes); nrow(convergent_genes2)
 
-write.csv(triple_convergent, "CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv")
+write.csv(triple_convergent, "CHLA9_vs_CHLA10_RNA_ATAC_GeneScore_convergent_genes.csv", row.names=FALSE)
+# all values are from genescore findmarkers() results
+# 
 ```
 
 Reduced from convergent_genes2 (4088) to triple_convergent (457), so these genes have
@@ -563,7 +637,10 @@ sum(lr_da_peaks$p_val_adj <= 0.05 & abs(lr_da_peaks$avg_log2FC) >= 0.25, na.rm =
 ```
 
 ```{r}
-
+# clearing
+#rm(list=ls(all.names=TRUE))
+#gc()
+#ls()
 ```
 
 ```{r}
