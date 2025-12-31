@@ -1279,6 +1279,11 @@ scATAC DA
     - answers q "Which genes are most likely under true regulatory control POST treatment"
     - went from ~4000 genes from the convergent file to ~457
 
+### Note, 12/30:
+To clarify, the convergent genes table identifies genes that are implicated across RNA expression, gene-level accessibility, and local chromatin accessibility--does not presume directional agreement. 
+
+Values in table are from genescorematrix analysis
+
     - *focused fiber-seq analysis on specific loci*
     - *specific genes for motif enrichment?*
     - *cross check w/ known EwS genes*
@@ -1332,3 +1337,23 @@ DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv<br> DA_peaks_CHLA9_vs_CHLA10
 git add scAnalysis_Rmd/
 git commit -m "adding all .Rmd files (scRNA-scATAC)"
 git push origin main
+
+
+## Tues, 12/30
+
+Met with Vini and Josh to discuss progress over winter break and decide on what figures to maybe present
+
+- Add gene labels to volcano plot
+- Clean up stacked bar plot
+- Also need to write figure caption for presentation
+
+- Clarified some things about converging_genes.csv (noted in post above)
+
+Misc notes.
+- R studio being a pain 
+- next time remember to save .rds for intermediate objects (seu_chla, lr_da_peaks, sig_da_anno)
+- Discussing padj val, pval, log2FC:
+    - pval: probability of observing result 
+    - adj pval: pval that has been corrected to account for multiple testing
+
+adj pval more powerful metric for significance calling
