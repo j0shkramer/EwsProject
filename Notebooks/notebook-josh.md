@@ -681,3 +681,26 @@ There does not appear to be any difference in chromatin openedness or methylated
 
 I orginally had a table to organize my progress, but it was all similar so kinda a waste of space
 
+# Wednesday, January 7th
+
+## Exploring Methylation
+
+Trying to find a program that will visualize methylation data
+
+https://rrazaghi.github.io/modbamtools/tutorial/ 
+
+```
+conda create -n modbamtools
+conda activate modbamtools
+modbamtools --version
+modbamtools, version 0.5.0
+```
+
+```
+modbamtools plot -r chr22:29200000-29400000 --gtf joshkram/human_genome/gen
+code.v38.annotation.sorted.gtf.gz --out joshkram/methylation --prefix chla9_ewsr1 --samples CHLA9 --track-titles Genes shared/250711_lewings_lines/pacbiowdlR/CHLA9/CHLA9.GRCh38.haplotagged.bam
+```
+
+Created outputs in joshkram/methylation
+
+Hoping to determine if I can set a specific type of methylation to look for.
