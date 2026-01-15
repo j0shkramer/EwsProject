@@ -1357,3 +1357,22 @@ Misc notes.
     - adj pval: pval that has been corrected to account for multiple testing
 
 adj pval more powerful metric for significance calling
+
+
+## Sun-Mon, 1/11-12
+
+Performed GSEA using genes associated with differentially accessible ATAC-seq peaks (using DA_peaks...scATAC.csv). DA peaks were collapsed to one representative value per gene. Selected the nearby peak that had the strongest combined effect size and statistical significance. 
+
+GSEA done using clusterProfiler with the MSigDb Hallmark dataset first. Identified pathways when there was no significance filtering, but when filtered only 2 pathways were identified (Angiogenesis and WNT beta catenin signaling).
+
+I switched to using GO BP gene set and once again pathways were identified without significance filtering. Once filtered, 0 pathways were highlighted.
+
+This suggests that chromatin accessibility changes are distributed across multiple pathways instead of dominating one strongly enriched niche biological program.
+
+With the lack of significant pathways enriched, this analysis was more exploratory and I've decided not to puruse it further. Will be shifting to focusing on Vini's work with TF motif enrichment as well as whatever work was being planned for SV and Fiber-seq.
+
+
+## Week of 1/12
+
+Switching focus to poster presentation for GiA.<br>
+Uploading stacked bar plot and UMAP svgs to github repo for Vini
