@@ -1376,3 +1376,11 @@ With the lack of significant pathways enriched, this analysis was more explorato
 
 Switching focus to poster presentation for GiA.<br>
 Uploading stacked bar plot and UMAP svgs to github repo for Vini
+
+## 1/18
+
+Stacked bar plot of transcriptional program distribution across ALL 9 cell lines for poster figure (instead of UMAP). Did this already for CHLA9 vs CHLA10, just reused code for all 9 cls instead.
+
+Removed gene names from volcano plot for poster.
+
+Uploaded figures and updated .Rmds to repo

@@ -26,6 +26,8 @@ library(svglite)
 
 ```{r}
 # read in integrated rds obj
+#rm(list = ls())
+#gc()
 seu_rna = readRDS("/Users/thejesnair/Desktop/KCGIP/EwS/seurat_integration_finalAnnotations.rds")
 ```
 
@@ -85,6 +87,48 @@ ggplot(df_props, aes(x = cell_line, y = prop, fill = final_annotation)) +
 
 ggsave("CHLA9_vs_CHLA10_transcriptional_programs.png", units = "in", width=10, height=8, dpi=900)
 ggsave("CHLA9_vs_CHLA10_transcriptional_programs.svg", width=10, height=8, dpi=900)
+```
+*STACKED BAR PLOT FOR ALL CELL LINES*
+This is for a poster figure
+
+```{r}
+# All cell line cluster distribution
+tab_counts2 = table(seu_rna$final_annotation, seu_rna$cell_line)
+tab_counts2
+
+# summarize by final annotation states not cluster IDs
+tab_props2 = prop.table(tab_counts2, margin = 2)
+round(tab_props2, 3)
+
+
+#tab_state = table(chla$final_annotation, chla$cell_line)
+#round(prop.table(tab_state, margin=2), 3)
+
+df_props2 = as.data.frame(tab_props2)
+df_props2 = factor(
+  df_props$cell_line,
+  levels =  c("A4573", "A673", "CHLA9", "CHLA10", "PDX305", "RDES", "SKNMC", "TC32", "TC71") # reorder CHLA9, CHLA10 so next to eachother
+)
+colnames(df_props2) <- c("final_annotation", "cell_line", "prop")
+
+ggplot(df_props2, aes(x = cell_line, y = prop, fill = final_annotation)) +
+  geom_col() +
+  labs(fill="Transcriptional programs")+
+  ylab("Proportion of cells") +
+  xlab("") +
+  theme_classic(base_size=18) + 
+  scale_fill_manual(values = c(
+  "Stress-like" = "#D55E00",
+  "Mesenchymal-like" = "#E69F00",
+  "Mesenchymal-like (highly proliferative)" = "#009E73",
+  "Neural-like" = "#0072B2",
+  "Mixed neural/mesenchymal" = "#7E6BD6",
+  "Highly proliferative" = "#CC79A7",
+  "Neural crest-like" = "#A63603"
+))
+
+ggsave("9cls_transcriptional_programs.png", units = "in", width=15, height=8, dpi=900)
+ggsave("9cls_transcriptional_programs.svg", width=15, height=8, dpi=900)
 ```
 
 CHLA9 and CHLA10 occupy a shared transcriptional state space with no evidence for the emergence of novel cell states post-treatment.
