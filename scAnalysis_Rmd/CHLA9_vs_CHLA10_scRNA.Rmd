@@ -105,11 +105,13 @@ round(tab_props2, 3)
 #round(prop.table(tab_state, margin=2), 3)
 
 df_props2 = as.data.frame(tab_props2)
-df_props2 = factor(
-  df_props$cell_line,
+colnames(df_props2) <- c("final_annotation", "cell_line", "prop")
+
+# reorder x-axis
+df_props2$cell_line = factor(
+  df_props2$cell_line,
   levels =  c("A4573", "A673", "CHLA9", "CHLA10", "PDX305", "RDES", "SKNMC", "TC32", "TC71") # reorder CHLA9, CHLA10 so next to eachother
 )
-colnames(df_props2) <- c("final_annotation", "cell_line", "prop")
 
 ggplot(df_props2, aes(x = cell_line, y = prop, fill = final_annotation)) +
   geom_col() +

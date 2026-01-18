@@ -332,7 +332,7 @@ plot_df = lr_da_peaks2 %>%
   mutate(Direction = case_when(
     p_val_adj <= 0.05 & avg_log2FC >= 0.25 ~ "More open in CHLA9",
     p_val_adj <= 0.05 & avg_log2FC <= -0.25 ~ "More open in CHLA10",
-    TRUE ~ "Not sig"
+    TRUE ~ "Not significant"
   ))
 
 volcano_genes = ggplot(plot_df, aes(x = avg_log2FC, y = -log10(p_val_adj), color = Direction)) +
@@ -376,6 +376,44 @@ ggsave("DA_CHLA9_CHLA10_figure.svg", width=10, height=8, dpi=900)
 Figure for poster presentation
 
 ```{r}
+
+# had to reload data from csv file because issues with RStudio, forgot to save .rds
+lr_da_peaks2 = read.csv("DA_peaks_CHLA9_vs_CHLA10_scATAC.csv")
+sig_da_anno  = read.csv("DA_peaks_CHLA9_vs_CHLA10_annotated_nearest_gene.csv")
+
+# select labels
+plot_df = lr_da_peaks2 %>%
+  mutate(Direction = case_when(
+    p_val_adj <= 0.05 & avg_log2FC >= 0.25 ~ "More open in CHLA9",
+    p_val_adj <= 0.05 & avg_log2FC <= -0.25 ~ "More open in CHLA10",
+    TRUE ~ "Not significant"
+  ))
+
+volcano_genes = ggplot(plot_df, aes(x = avg_log2FC, y = -log10(p_val_adj), color = Direction)) +
+  geom_point(alpha = 0.6, size = 1) +
+  theme_classic(base_size = 18) +
+  xlab("log2FC accessibility (CHLA9 − CHLA10)") +
+  ylab("-log10(adj p-value)") +
+  #ggtitle("Differential accessibility (ATAC): CHLA9 vs CHLA10") +
+  theme(
+    legend.title=element_text(size=16),
+        legend.text=element_text(size=14)) +
+  guides(
+    color=guide_legend(
+      override.aes=list(size=3)
+    )
+  ) +
+  scale_color_manual(
+    name="Direction",
+    values = c(
+  "More open in CHLA10" = "#0072B2",
+  "More open in CHLA9"  = "#C76E00",
+  "Not significant"             = "grey80"
+)
+  )
+
+volcano_genes
+ggsave("DA_CHLA9_CHLA10_figure2.svg", width=10, height=8, dpi=900)
 
 ```
 
