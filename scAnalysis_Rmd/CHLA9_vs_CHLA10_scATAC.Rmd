@@ -372,6 +372,8 @@ volcano_genes = ggplot(plot_df, aes(x = avg_log2FC, y = -log10(p_val_adj), color
 volcano_genes
 ggsave("DA_CHLA9_CHLA10_figure.svg", width=10, height=8, dpi=900)
 ```
+
+
 *UNLABELLED VOLCANO PLOT*
 Figure for poster presentation
 
@@ -415,6 +417,20 @@ volcano_genes = ggplot(plot_df, aes(x = avg_log2FC, y = -log10(p_val_adj), color
 volcano_genes
 ggsave("DA_CHLA9_CHLA10_figure2.svg", width=10, height=8, dpi=900)
 
+# numbers for fig caption
+da_sig = plot_df %>%
+  filter(p_val_adj <= 0.05, abs(avg_log2FC) >= 0.25)
+
+n_total = nrow(da_sig)
+n_total
+
+n_chla9 = sum(da_sig$avg_log2FC > 0)
+n_chla10 = sum(da_sig$avg_log2FC < 0)
+
+n_chla9
+n_chla10
+
+n_chla9 + n_chla10
 ```
 
 ```{r}

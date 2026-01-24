@@ -1384,3 +1384,7 @@ Stacked bar plot of transcriptional program distribution across ALL 9 cell lines
 Removed gene names from volcano plot for poster.
 
 Uploaded figures and updated .Rmds to repo
+
+## 1/24
+
+Updated .rmds (codes required for final volcano stacked bar plots for poster)
