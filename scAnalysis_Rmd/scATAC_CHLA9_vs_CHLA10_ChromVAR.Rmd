@@ -1,0 +1,183 @@
+---
+title: "scATAC_CHLA9_vs_CHLA10_ChromVAR"
+author: "Vini Karumuru"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Seurat)
+library(Signac)
+library(GenomicRanges)
+library(chromVAR)
+library(SummarizedExperiment)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(JASPAR2020)
+library(TFBSTools)
+library(motifmatchr)
+library(Matrix)
+library(dplyr)
+library(tibble)
+library(ComplexHeatmap)
+library(circlize)
+```
+
+
+
+```{r}
+seurat_object = readRDS(file = "/Users/vinita/bioinfo/EwS_Project/SingleCell/CHLA9_CHLA10.rds")
+```
+
+
+
+```{r}
+# peak x cell counts
+peak_matrix <- GetAssayData(
+  object = seurat_object,
+  assay = "ATAC",
+  slot = "counts"
+)
+
+# peak genomic coordinates
+peak_granges <- Signac::StringToGRanges(
+  regions = rownames(peak_matrix),
+  sep = c(":", "-")
+)
+
+se <- SummarizedExperiment(
+  assays = list(counts = peak_matrix),
+  rowRanges = peak_granges,
+  colData = seurat_object@meta.data
+)
+
+se <- addGCBias(se, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+```
+
+```{r}
+pfms <- getMatrixSet(
+  JASPAR2020,
+  opts = list(species = 9606, all_versions = FALSE)
+)
+
+motif_ix <- matchMotifs(
+  pfms,
+  se,
+  genome = BSgenome.Hsapiens.UCSC.hg38
+)
+
+```
+
+
+```{r}
+# count total fragments per peak
+peak_sums <- rowSums(peak_matrix)
+nonzero_peaks <- peak_sums > 0
+
+peak_matrix <- peak_matrix[nonzero_peaks, ]
+peak_granges <- peak_granges[nonzero_peaks]
+```
+
+
+```{r}
+se <- SummarizedExperiment(
+  assays = list(counts = peak_matrix),
+  rowRanges = peak_granges,
+  colData = seurat_object@meta.data
+)
+
+se <- addGCBias(se, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+pfms <- getMatrixSet(JASPAR2020, opts=list(species=9606, all_versions=FALSE))
+motif_ix <- matchMotifs(pfms, se, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+dev <- computeDeviations(se, annotations = motif_ix)
+dev_z <- deviationScores(dev)
+```
+
+```{r}
+motif_annot <- as.data.frame(colData(motif_ix))
+motif_annot$motif_id <- colnames(motif_ix)
+head(motif_annot)
+```
+
+```{r}
+# convert dev_z to data frame
+dev_df <- as.data.frame(dev_z) %>%
+  rownames_to_column("motif_id") %>%
+  left_join(motif_family, by = "motif_id") %>%
+  group_by(family) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+# convert back to matrix
+family_mat <- as.matrix(dev_df[,-1])
+rownames(family_mat) <- dev_df$family
+```
+
+
+
+```{r}
+
+# define TF families for motifs
+motif_family <- motif_annot %>%
+  mutate(family = case_when(
+    grepl("HOX|Hox", name, ignore.case = TRUE) ~ "Homeobox",
+    grepl("^RFX", name, ignore.case = TRUE) ~ "Hth",
+    grepl("RUNX|Runt", name, ignore.case = TRUE) ~ "Runt",
+    grepl("ZNF|Zf", name, ignore.case = TRUE) ~ "Zf",
+    TRUE ~ "Other"
+  )) %>%
+  select(motif_id, name, family)
+
+# combine chromVAR deviations with TF info
+dev_df <- as.data.frame(dev_z) %>%
+  rownames_to_column("motif_id") %>%
+  left_join(motif_family, by = "motif_id") %>%
+  arrange(family, name)
+
+# compute variance per motif
+dev_df$var <- apply(dev_df[, colnames(dev_z)], 1, var)
+
+# select top 5 motifs per TF family
+top_motifs <- dev_df %>%
+  group_by(family) %>%
+  slice_max(order_by = var, n = 5) %>%
+  ungroup()
+
+# aggregate by cell line
+cell_cols <- colnames(dev_z)
+cell_lines <- colData(se)$cell_line
+
+line_mat <- matrix(NA, nrow = length(unique(cell_lines)), ncol = nrow(top_motifs))
+rownames(line_mat) <- unique(cell_lines)
+colnames(line_mat) <- paste0(top_motifs$family, "_", top_motifs$name)
+
+for (cl in unique(cell_lines)) {
+  motif_values <- as.matrix(top_motifs[, cell_cols])
+  line_mat[cl, ] <- rowMeans(motif_values[, cell_lines == cl, drop = FALSE])
+}
+
+# order columns by TF family for visual grouping
+col_order <- order(sapply(strsplit(colnames(line_mat), "_"), `[`, 1))
+line_mat <- line_mat[, col_order, drop = FALSE]
+
+col_families <- sapply(strsplit(colnames(line_mat), "_"), `[`, 1)
+
+# plot heatmap
+Heatmap(
+  line_mat,
+  name = "chromVAR Z-score",
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  column_split = col_families,
+  show_row_names = TRUE,
+  show_column_names = TRUE,
+  row_title = "Cell Lines",
+  column_title = "Top 5 motifs per TF family",
+  col = colorRamp2(c(-2, 0, 2), c("#3c647d", "white", "#dd944d")),
+  heatmap_legend_param = list(title = "chromVAR Z")
+)
+```
+
+

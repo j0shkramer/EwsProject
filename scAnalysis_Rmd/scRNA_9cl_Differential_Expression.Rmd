@@ -1,0 +1,167 @@
+---
+title: "scRNA_9cl_Differential_Expression"
+author: "Vini Karumuru"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Seurat)
+library(MAST)
+library(tidyverse)
+```
+
+
+```{r}
+# read in Seurat object
+seurat_object = readRDS(file = "/Users/vinita/bioinfo/EwS_Project/SingleCell/seurat_integration_finalAnnotations.rds")
+Idents(seurat_object) = "cell_line"
+seurat_object
+```
+```{r}
+# read in cell line combinations
+sv_gene_cl_combos = read.csv("/Users/vinita/bioinfo/EwS_Project/VariantAnnotation/sv_gene_cl_combos.csv")
+sv_gene_cl_combos
+
+# get number of variant-associated genes for each cell line combination
+top_sv_gene_cl_combo_counts = sv_gene_cl_combos %>% 
+                                group_by(CellLineCombo) %>%
+                                summarize(count = n()) %>%
+                                # get rid of empty line
+                                filter(CellLineCombo != "") %>%
+                                # order by decreasing count
+                                arrange(desc(count)) %>%
+                                # get top 40 cell line combinations (for visualization purposes)
+                                head(40)
+top_sv_gene_cl_combo_counts
+```
+```{r}
+# subset down to top cell line combinations
+top_sv_gene_cl_combos = sv_gene_cl_combos %>%
+                          filter(CellLineCombo %in% top_sv_gene_cl_combo_counts$CellLineCombo) %>%
+                          filter(CellLineCombo != "A4573-A673-CHLA10-CHLA9-PDX305-RDES-SKNMC-TC32-TC71")
+top_sv_gene_cl_combos
+```
+
+
+```{r}
+# initialize data frame for holding differential expression stats
+sv_de_stats_df = data.frame(
+  CellLineCombo = character(0),
+  unique_sv_genes = character(0),
+  intergenic_sv = character(0),
+  intragenic_sv = character(0),
+  de_intergenic_sv = character(0),
+  de_intragenic_sv = character(0)
+)
+```
+
+```{r}
+cell_lines = c("A4573", "A673", "CHLA10", "CHLA9", "PDX305", "RDES", "SKNMC", "TC32", "TC71")
+
+cell_line_combos = top_sv_gene_cl_combos %>%
+  select(CellLineCombo) %>%
+  unique() %>% unlist()
+
+# loop through cell line combinations
+for (current_cl_combo in cell_line_combos) {
+  
+# get list of SV genes in cell line combination
+current_cl_combo_sv_genes =  top_sv_gene_cl_combos %>%
+                                filter(CellLineCombo == current_cl_combo)
+gene_list = c()
+unique_sv_genes = unique(current_cl_combo_sv_genes$Gene)
+num_unique_sv_genes = length(unique(current_cl_combo_sv_genes$Gene))
+
+# loop through genes
+for (gene in unique_sv_genes) {
+  # split up genes if SV was intergenic
+  if (grepl("|", gene, fixed = TRUE)) {
+    genes = strsplit(gene, split = "|", fixed = TRUE) %>% unlist()
+    gene_list = c(gene_list, genes)
+  } else {
+    gene_list = c(gene_list, gene)
+  }
+}
+
+gene_list_exp = unique(gene_list[gene_list %in% row.names(seurat_object)])
+
+cls_sv = strsplit(current_cl_combo, split = "-") %>% unlist()
+# get list of cell lines that don't have SVs in those genes
+cls_no_sv = setdiff(cell_lines, cls_sv)
+
+# run FindMarkers to perform differential expression test (MAST) on SV genes between SV+ vs. SV- cell lines 
+fm_output = FindMarkers(object = seurat_object,
+                                 ident.1 = cls_sv,
+                                 ident.2 = cls_no_sv,
+                                 features = gene_list_exp,
+                                 min.pct = 0,
+                                 logfc.threshold = 0,
+                                 min.cells.feature = 0,
+                                 min.cells.group = 1,
+                                 test.use = "MAST",
+                                 verbose = FALSE)
+
+# filter down to significantly differentially expressed genes (|log2FC|>1, adj-p < 0.05)
+fm_output_de = fm_output %>%
+                 filter(abs(avg_log2FC) > 1) %>%
+                 filter(p_val_adj < 0.05)
+
+degs = row.names(fm_output_de)
+
+num_intergenic_sv = 0
+num_de_intergenic_sv = 0
+num_intragenic_sv = 0
+num_de_intragenic_sv = 0
+# check if cell line combination's SV genes are differentialy expressed
+for (gene in unique_sv_genes) {
+  if (grepl("|", gene, fixed = TRUE)) {
+    num_intergenic_sv = num_intergenic_sv + 1
+    genes = strsplit(gene, split = "|", fixed = TRUE) %>% unlist()
+    # if either closest upstream or downstream gene is differentially expressed, count it as differentially expressed
+    if (any(genes %in% degs)) {
+      num_de_intergenic_sv = num_de_intergenic_sv + 1
+    }
+  } else {
+    num_intragenic_sv = num_intragenic_sv + 1
+    if (gene %in% degs) {
+      num_de_intragenic_sv = num_de_intragenic_sv + 1
+    }
+  }
+}
+
+# add stats to 
+cl_de_stats = data.frame(  
+  CellLineCombo = c(current_cl_combo),
+  unique_sv_genes = c(num_unique_sv_genes),
+  intergenic_sv = c(num_intergenic_sv),
+  intragenic_sv = c(num_intragenic_sv),
+  de_intergenic_sv = c(num_de_intragenic_sv),
+  de_intragenic_sv = c(num_de_intergenic_sv))
+
+sv_de_stats_df = rbind(sv_de_stats_df, cl_de_stats)
+
+}
+```
+
+
+
+```{r}
+write.csv(sv_de_stats_df, "sv_differential_expression_stats.csv", row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
