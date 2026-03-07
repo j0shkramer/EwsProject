@@ -307,8 +307,8 @@
     
     | CHLA9 | CHLA10 |
     | --- | --- |
-    | HOX/Homeobox | RFX/HTH
-    RUNX |
+    | HOX/Homeobox | RFX/HTH |
+    |  | RUNX |
 
 ## ChromVAR Deviation Scores
 
