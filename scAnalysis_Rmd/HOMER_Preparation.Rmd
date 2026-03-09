@@ -1,0 +1,144 @@
+---
+title: "HOMER_Preparation_Part2"
+author: "Vini Karumuru"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Seurat)
+library(Signac)
+library(GenomicRanges)
+library(rtracklayer)
+library(tidyverse)
+```
+
+## R Markdown
+```{r}
+seurat_object = readRDS(file = "/Users/vinita/bioinfo/EwS_Project/SingleCell/CHLA9_CHLA10.rds")
+DefaultAssay(seurat_object) <- "ATAC"
+
+seurat_object
+```
+
+```{r}
+seurat_object[["ATAC"]] <- CreateChromatinAssay(
+  counts = GetAssayData(seurat_object, assay = "ATAC", layer = "data"),
+  sep = c("-", "-"),
+  genome = "hg38"
+)
+```
+
+```{r}
+seurat_object
+```
+
+```{r}
+peaks <- granges(seurat_object)
+```
+
+```{r}
+export(
+  object = peaks,
+  con = "atac_peaks_chla9_chla10.bed",
+  format = "BED"
+)
+```
+
+```{r}
+chla9 = subset(seurat_object, idents = "CHLA9")
+ncol(chla9)
+peaks9 <- granges(chla9)
+export(
+  object = peaks9,
+  con = "atac_peaks_chla9.bed",
+  format = "BED"
+)
+```
+```{r}
+
+table(Idents(seurat_object))
+
+```
+
+```{r}
+chla10 = subset(seurat_object, idents = "CHLA10")
+ncol(chla10)
+peaks10 <- granges(chla10)
+export(
+  object = peaks10,
+  con = "atac_peaks_chla10.bed",
+  format = "BED"
+)
+```
+
+```{r}
+dap_9 <- FindMarkers(
+  object = seurat_object,
+  ident.1 = "CHLA9",
+  ident.2 = "CHLA10",
+  only.pos = TRUE
+)
+
+```
+
+```{r}
+dap_9 = dap_9 %>%
+  filter(p_val_adj < 0.05)
+dap_9
+```
+
+```{r}
+dap_10 <- FindMarkers(
+  object = seurat_object,
+  ident.1 = "CHLA10",
+  ident.2 = "CHLA9",
+  only.pos = TRUE
+)
+
+```
+
+```{r}
+dap_10 = dap_10 %>%
+  filter(p_val_adj < 0.05)
+```
+
+
+```{r}
+dap <- FindMarkers(
+  object = seurat_object,
+  ident.1 = "CHLA10",
+  ident.2 = "CHLA9",
+  min.pct = 0.05,
+  logfc.threshold = 0.25 
+)
+```
+
+```{r}
+dap %>%
+  filter(p_val_adj < 0.05)
+```
+
+
+```{r}
+chla9_da_so = subset(seurat_object, features = row.names(dap_9))
+peaks9 <- granges(chla9_da_so)
+export(
+  object = peaks9,
+  con = "atac_peaks_chla9_da.bed",
+  format = "BED"
+)
+
+```
+
+```{r}
+chla10_da_so = subset(seurat_object, features = row.names(dap_10))
+peaks10 <- granges(chla10_da_so)
+export(
+  object = peaks10,
+  con = "atac_peaks_chla10_da.bed",
+  format = "BED"
+)
+```
+
